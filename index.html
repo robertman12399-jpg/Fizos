@@ -13,7 +13,29 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Rubik:wght@400;500;600;700&display=swap&subset=cyrillic,cyrillic-ext,latin" rel="stylesheet">
 
-  
+  <!-- ============================================================
+       PWA: делает приложение устанавливаемым на телефон («Добавить
+       на главный экран») и рабочим офлайн после первого открытия.
+       manifest.json, sw.js и иконки должны лежать РЯДОМ с этим файлом
+       на хостинге — см. README.md в этой же папке.
+
+       ВАЖНО: <link rel="manifest"> НЕ прописан здесь напрямую в HTML.
+       Раньше так и было, но при открытии файла локально (двойным
+       кликом, через file:// — без хостинга) браузер на Windows иногда
+       пытается загрузить manifest.json как часть обработки самого
+       документа ещё ДО того, как выполнится любой JS, и в некоторых
+       версиях Chrome эта внутренняя попытка мешает странице нормально
+       достроиться — интерфейс подгружается, но перестаёт реагировать
+       на клики. Тег безопасен на настоящем хостинге (https://), но
+       рискован при открытии файла с диска — а игру часто открывают
+       именно так. Поэтому манифест подключается ниже через JS, ПОСЛЕ
+       того как вся игра уже загрузилась и работает — на https сработает
+       как обычно, а на file:// просто тихо не подключится, ничего не
+       ломая. -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ФизМат RPG">
+
   <style>
 /* ============================================================
    ФизМат RPG — style.css
@@ -752,6 +774,12 @@ button.hud-chip.streak-off { color: var(--muted, #9aa0c7); opacity: .7; }
 .zad-calib { margin-top: 8px; padding: 9px 12px; border-radius: 10px; font-size: 13px; line-height: 1.45;
   background: rgba(56,225,255,.08); border: 1px solid rgba(56,225,255,.28); color: #b9ecff; }
 
+/* — Задачник: шаг «нарисуй силы» перед ответом и сравнение с эталоном — */
+.zad-force-step { margin-top: 8px; }
+.zad-force-review { margin: 10px 0 12px; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,.12); }
+.zad-force-given { font-size: 13.5px; color: var(--muted, #9aa0c7); margin-bottom: 8px; }
+.zad-force-given b { color: var(--text, #eef1ff); }
+
 /* — Практика внутри сцены — */
 .vn-practice { margin-top: 14px; display: flex; flex-direction: column; gap: 12px; }
 .vn-ptitle { font-family: "Russo One", system-ui, sans-serif; font-size: 14px; color: var(--star-gold, #ffd166); }
@@ -1430,6 +1458,7 @@ button.hud-chip.streak-off { color: var(--muted, #9aa0c7); opacity: .7; }
 .force-canvas-label.good { color: #4ade80; font-weight: 700; }
 .force-canvas-wrap { border: 1px solid rgba(255,255,255,.10); border-radius: 12px; background: rgba(255,255,255,.03); overflow: hidden; touch-action: none; }
 .force-canvas { display: block; width: 100%; height: auto; cursor: grab; }
+.graph-canvas { display: block; width: 100%; height: auto; cursor: crosshair; touch-action: none; }
 .force-pool { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 12px; }
 .force-chip {
   padding: 8px 12px; border-radius: 10px; border: 1.5px solid var(--chip-color, #38e1ff); background: transparent;
@@ -1443,6 +1472,63 @@ button.hud-chip.streak-off { color: var(--muted, #9aa0c7); opacity: .7; }
 .force-actions { margin-top: 6px; }
 .force-followup { margin-top: 12px; padding-top: 12px; border-top: 1px dashed rgba(255,255,255,.12); }
 @media (max-width: 480px) { .force-canvas-col { flex: 1 1 100%; } }
+
+/* ---------- переключатель режимов «Расставь силы» ---------- */
+.force-mode-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+.force-mode-tab {
+  padding: 7px 14px; border-radius: 999px; border: 1.5px solid var(--space-line);
+  background: rgba(255,255,255,.03); color: var(--muted); font-size: 12.5px; font-weight: 600;
+  cursor: pointer; transition: all .15s ease;
+}
+.force-mode-tab.on { background: var(--accent); border-color: var(--accent); color: #0a0a1f; }
+.force-mode-tab:hover:not(.on) { background: rgba(255,255,255,.07); color: var(--text); }
+
+/* ---------- свободный SVG-редактор сил («Нарисуй сам», как на ЕГЭ) ---------- */
+.force-free-wrap { margin-top: 8px; }
+.draw {
+  border: 1px solid var(--space-line); border-radius: var(--radius-s);
+  background: rgba(255,255,255,.02); padding: 12px;
+}
+.draw__bar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.draw__tool {
+  width: 38px; height: 36px; display: grid; place-items: center;
+  border: 1px solid transparent; border-radius: 8px; background: rgba(255,255,255,.04);
+  color: var(--muted); font-size: 16px; cursor: pointer; transition: all .15s ease;
+}
+.draw__tool:hover { background: rgba(255,255,255,.09); color: var(--text); }
+.draw__tool.is-on { background: rgba(56,225,255,.18); border-color: var(--accent); color: var(--accent); }
+
+.draw__labels {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  padding: 10px 0; margin-bottom: 10px;
+  border-top: 1px solid var(--space-line); border-bottom: 1px solid var(--space-line);
+}
+.draw__label {
+  padding: 6px 12px; border: 1px solid transparent; border-radius: 999px;
+  background: rgba(255,255,255,.05); color: var(--muted); font-family: var(--font-body);
+  font-size: 12.5px; cursor: pointer; transition: all .15s ease;
+}
+.draw__label:hover { background: rgba(255,255,255,.1); color: var(--text); }
+.draw__label.is-on { background: var(--accent); color: #0a0a1f; border-color: transparent; }
+.draw__custom {
+  max-width: 150px; min-height: 30px; padding: 6px 10px; font-size: 12.5px;
+  color: var(--text); background: var(--space-deep); border: 1px solid var(--space-line);
+  border-radius: 999px;
+}
+.draw__custom:focus { border-color: var(--accent); outline: none; }
+
+.draw__wrap {
+  background: rgba(255,255,255,.03); border: 1px solid var(--space-line);
+  border-radius: 10px; overflow: hidden;
+}
+.draw__svg { display: block; width: 100%; height: auto; color: var(--text); }
+.draw__canvas { touch-action: none; cursor: crosshair; }
+.draw__foot { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.draw__hint { font-size: 12px; color: var(--muted); }
+
+@media (max-width: 480px) {
+  .draw__tool { width: 40px; height: 40px; }
+}
 
 .prob-sub { font-size: 12px; color: var(--muted, #9aa0c7); margin: -2px 0 10px; }
 .prob { border: 1px solid rgba(255,255,255,.10); border-radius: 14px; padding: 12px 13px; margin-bottom: 10px; background: rgba(255,255,255,.03); }
@@ -1671,19 +1757,20 @@ button.hud-chip.streak-off { color: var(--muted, #9aa0c7); opacity: .7; }
 
 .onb-overlay { position: fixed; inset: 0; z-index: 95; background: rgba(6,8,20,.82); backdrop-filter: blur(6px);
   display: flex; align-items: center; justify-content: center; padding: 22px; animation: tsFade .2s ease both; }
-.onb-card { width: 100%; max-width: 380px; text-align: center; background: var(--space-deep, #12122e);
-  border: 1px solid var(--accent); border-radius: 20px; padding: 28px 24px; box-shadow: 0 24px 70px rgba(0,0,0,.55); }
-.onb-ico { font-size: 46px; margin-bottom: 12px; }
-.onb-title { font-family: var(--font-display); font-size: 19px; color: var(--text); margin-bottom: 10px; }
-.onb-text { font-size: 14px; color: var(--muted); line-height: 1.6; margin-bottom: 18px; }
-.onb-dots { display: flex; justify-content: center; gap: 7px; margin-bottom: 18px; }
-.onb-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.18); transition: all .2s ease; }
-.onb-dot.on { background: var(--accent); width: 22px; border-radius: 999px; }
-.onb-btns { display: flex; gap: 10px; }
-.onb-btns .btn { flex: 1; }
+.onb-card { width: min(320px, calc(100vw - 32px)); text-align: center; background: var(--space-deep, #12122e);
+  border: 1px solid var(--accent); border-radius: 16px; padding: 16px 18px; box-shadow: 0 24px 70px rgba(0,0,0,.55);
+  max-height: calc(100dvh - 32px); overflow-y: auto; }
+.onb-ico { font-size: 28px; margin-bottom: 6px; }
+.onb-title { font-family: var(--font-display); font-size: 16px; color: var(--text); margin-bottom: 5px; }
+.onb-text { font-size: 13px; color: var(--muted); line-height: 1.4; margin-bottom: 12px; }
+.onb-dots { display: flex; justify-content: center; gap: 5px; margin-bottom: 12px; flex-wrap: wrap; }
+.onb-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.18); transition: all .2s ease; flex: none; }
+.onb-dot.on { background: var(--accent); width: 16px; border-radius: 999px; }
+.onb-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.onb-btns .btn { flex: 1; min-width: 90px; padding: 9px 10px; font-size: 13px; }
 /* Экскурсия с подсветкой: когда есть спотлайт, затемнение делает сам
    .onb-spot огромной тенью, поэтому фон самого оверлея убираем. */
-.onb-overlay.has-spot { background: transparent; backdrop-filter: none; display: block; padding: 0; }
+.onb-overlay.has-spot { background: transparent; backdrop-filter: none; padding: 0; }
 .onb-spot { position: fixed; border-radius: 14px; pointer-events: none;
   box-shadow: 0 0 0 9999px rgba(6,8,20,.82), 0 0 0 3px var(--accent, #38e1ff), 0 0 24px rgba(56,225,255,.55);
   animation: onbPulse 1.8s ease-in-out infinite; }
@@ -1691,12 +1778,30 @@ button.hud-chip.streak-off { color: var(--muted, #9aa0c7); opacity: .7; }
   0%, 100% { box-shadow: 0 0 0 9999px rgba(6,8,20,.82), 0 0 0 3px var(--accent, #38e1ff), 0 0 24px rgba(56,225,255,.55); }
   50% { box-shadow: 0 0 0 9999px rgba(6,8,20,.82), 0 0 0 3px var(--accent, #38e1ff), 0 0 34px rgba(56,225,255,.85); }
 }
-.onb-card-anchored { position: fixed; left: 50%; transform: translateX(-50%); max-width: 340px;
-  padding: 20px 18px; z-index: 96; }
-.onb-card-anchored .onb-ico { font-size: 34px; margin-bottom: 8px; }
-.onb-card-anchored .onb-title { font-size: 17px; }
-.onb-card-anchored .onb-text { font-size: 13.5px; margin-bottom: 14px; }
+/* Карточка, привязанная к подсвеченному элементу: небольшая плашка —
+   без крупной иконки (её роль уже играет сама подсветка на экране),
+   короткий заголовок и одна строка пояснения. Задача — показать,
+   выделить, коротко пояснить, не превращая шаг в отдельный экран.
+   width:min(...) гарантирует, что она всегда влезает по ширине с
+   отступом 16px по бокам, независимо от размера экрана. */
+.onb-card-anchored { position: fixed; left: 50%; transform: translateX(-50%);
+  width: min(280px, calc(100vw - 32px)); max-height: calc(100dvh - 24px); overflow-y: auto;
+  padding: 10px 14px; z-index: 96; }
+.onb-card-anchored .onb-ico { display: none; }
+.onb-card-anchored .onb-title { font-size: 13.5px; margin-bottom: 3px; }
+.onb-card-anchored .onb-text { font-size: 11.5px; line-height: 1.3; margin-bottom: 8px; }
+.onb-card-anchored .onb-dots { margin-bottom: 8px; gap: 4px; }
+.onb-card-anchored .onb-dot { width: 5px; height: 5px; }
+.onb-card-anchored .onb-dot.on { width: 13px; }
+.onb-card-anchored .onb-btns .btn { padding: 6px 8px; font-size: 12px; min-width: 70px; }
+.onb-card-anchored .onb-counter { margin-top: 8px; }
 .onb-counter { font-size: 11.5px; color: var(--muted); margin-top: 12px; opacity: .75; }
+
+/* Статичная экскурсия: пока она идёт, body зафиксирован через
+   position:fixed (с сохранённой прокруткой, см. lockBodyScroll в app.js) —
+   это надёжно останавливает тач-скролл фона даже там, где обычный
+   overflow:hidden на мобильном Safari не всегда срабатывает. */
+body.onb-locked { position: fixed; left: 0; right: 0; overflow: hidden; width: 100%; }
 
 /* ============================================================
    Причёсывающий проход — глобальная полировка
@@ -1787,6 +1892,28 @@ input, button, textarea, select { accent-color: var(--accent); }
 .graph-line.student { fill: none; stroke: #38e1ff; stroke-width: 3; }
 .graph-line.correct { fill: none; stroke: #4ade80; stroke-width: 2.5; stroke-dasharray: 6 4; }
 .graph-dot.student { fill: #38e1ff; }
+
+/* — 🌌 Созвездия прогресса — */
+.constell-grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 12px; }
+.constell-card { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 12px 14px; }
+.constell-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.constell-ico { font-size: 18px; }
+.constell-name { font-weight: 700; font-size: 14.5px; flex: 1; }
+.constell-count { font-size: 12.5px; color: var(--star-gold, #ffd166); font-family: "Russo One", monospace; }
+.constell-svg { width: 100%; display: block; margin: 4px 0; }
+.constell-star.lit { filter: drop-shadow(0 0 4px rgba(255,209,102,.8)); }
+.constell-star.ignite { animation: starIgnite 0.9s ease-out both; transform-box: fill-box; transform-origin: center; }
+@keyframes starIgnite {
+  0%   { opacity: 0; transform: scale(0.2) rotate(-25deg); filter: drop-shadow(0 0 0 rgba(255,209,102,0)); }
+  55%  { opacity: 1; transform: scale(1.5) rotate(8deg); filter: drop-shadow(0 0 10px rgba(255,209,102,1)); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); filter: drop-shadow(0 0 4px rgba(255,209,102,.8)); }
+}
+.constell-star.dim { fill: rgba(255,255,255,.15); }
+.constell-bar { height: 6px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; margin-top: 2px; }
+.constell-bar-fill { height: 100%; background: linear-gradient(90deg, #8b5cf6, #ffd166); border-radius: 999px; transition: width .4s ease; }
+.constell-bonus { margin-top: 8px; padding: 8px 11px; border-radius: 10px; font-size: 12.5px; background: rgba(255,209,102,.12); border: 1px solid rgba(255,209,102,.35); color: #ffe9b8; }
+.constell-next { margin-top: 6px; font-size: 11.5px; color: var(--muted, #9aa0c7); }
+@media (min-width: 640px) { .constell-grid { grid-template-columns: 1fr 1fr; } }
 
 </style>
 
@@ -3003,6 +3130,32 @@ const Storage = {
 };
 
 /* ----------------------------------------------------------
+   Глубокое слияние двух объектов состояния. Используется при импорте
+   сохранения: базовый объект (обычно defaultState()) задаёт полную
+   структуру полей, а source (импортируемые данные) переопределяет то,
+   что в нём реально есть — рекурсивно, на любом уровне вложенности,
+   а не только на верхнем. Это гарантирует, что импорт СТАРОГО
+   сохранения (сделанного до того, как в defaultState() добавили
+   новое вложенное поле — например, exam.bestPct) не затирает то,
+   чего это старое сохранение просто не могло знать.
+   Массивы и любые не-plain-object значения source побеждают целиком
+   (не мержатся поэлементно) — массив либо берётся из source, либо
+   остаётся из base, третьего варианта тут не бывает.
+---------------------------------------------------------- */
+function isPlainObject(v) {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+function deepMerge(base, source) {
+  if (!isPlainObject(base) || !isPlainObject(source)) return source !== undefined ? source : base;
+  const result = Object.assign({}, base);
+  Object.keys(source).forEach((key) => {
+    const sv = source[key], bv = base[key];
+    result[key] = (isPlainObject(bv) && isPlainObject(sv)) ? deepMerge(bv, sv) : sv;
+  });
+  return result;
+}
+
+/* ----------------------------------------------------------
    Состояние по умолчанию (новая игра)
 ---------------------------------------------------------- */
 function defaultState() {
@@ -3148,13 +3301,7 @@ const State = {
   importData(parsed) {
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false;
     if (!("hero" in parsed) && !("stats" in parsed) && !("settings" in parsed)) return false;
-    this.data = Object.assign(defaultState(), parsed);
-    this.data.stats = Object.assign(defaultState().stats, parsed.stats || {});
-    this.data.unlocks = Object.assign(defaultState().unlocks, parsed.unlocks || {});
-    this.data.equipped = Object.assign(defaultState().equipped, parsed.equipped || {});
-    this.data.settings = Object.assign(defaultState().settings, parsed.settings || {});
-    this.data.adventure = Object.assign(defaultState().adventure, parsed.adventure || {});
-    this.data.style = Object.assign(defaultState().style, parsed.style || {});
+    this.data = deepMerge(defaultState(), parsed);
     this.save();
     return true;
   },
@@ -3359,6 +3506,32 @@ const State = {
   missionsDoneCount() {
     const d = (this.data.course && this.data.course.done) || {};
     return Object.keys(d).filter((k) => d[k]).length;
+  },
+
+  /* --- 🌌 Созвездия прогресса: доля «звёзд» (пройденных тем) в каждом
+     из 4 направлений + прогрессивная награда за пройденные пороги.
+     Пороги проверяются лениво — при каждом открытии экрана созвездий,
+     а не из каждого места, где что-то засчитывается (иначе пришлось бы
+     трогать десяток разных обработчиков по всему коду). */
+  constellationMilestone(domain) {
+    return (this.data.constellations && this.data.constellations[domain]) || 0;
+  },
+  claimConstellationMilestones(domain, frac, table) {
+    if (!this.data.constellations) this.data.constellations = {};
+    const had = this.data.constellations[domain] || 0;
+    let idx = had, gained = { xp: 0, coins: 0 }, hitLabel = null;
+    while (idx < table.length && frac >= table[idx].frac) {
+      gained.xp += table[idx].xp; gained.coins += table[idx].coins; hitLabel = table[idx].label;
+      idx++;
+    }
+    if (idx > had) {
+      this.data.constellations[domain] = idx;
+      const res = this.addXP(gained.xp, "constellation");
+      this.addCoins(gained.coins);
+      this.save();
+      return { xp: gained.xp, coins: gained.coins, label: hitLabel, leveledUp: res.leveledUp };
+    }
+    return null;
   },
 
   /* --- Задачник: доп. задачи по темам (probKey = "секция:темаIdx:задачаIdx") --- */
@@ -9756,19 +9929,55 @@ GAME.problems = {
       problems: [
         { q: "Алюминиевый брусок объёмом 2 м³ лежит на полу, опираясь гранью площадью 0,5 м². Найдите массу, вес и давление на пол.",
           given: ["V = 2 м³", "S = 0,5 м²", "ρ = 2700 кг/м³", "g = 10 Н/кг"], find: "m, P, p — ?",
-          steps: ["m = ρ·V = 2700 · 2 = 5400 кг.", "P = m·g = 5400 · 10 = 54 000 Н.", "p = P / S = 54 000 / 0,5 = 108 000 Па."], answer: "m = 5400 кг, P = 54 кН, p = 108 кПа." },
+          steps: ["m = ρ·V = 2700 · 2 = 5400 кг.", "P = m·g = 5400 · 10 = 54 000 Н.", "p = P / S = 54 000 / 0,5 = 108 000 Па."], answer: "m = 5400 кг, P = 54 кН, p = 108 кПа.",
+          forceScene: {
+            given: "Брусок лежит неподвижно на полу",
+            refItems: [
+              { t: "ground", x1: 60, y1: 250, x2: 460, y2: 250 },
+              { t: "body", x1: 200, y1: 175, x2: 320, y2: 250, label: "m" },
+              { t: "force", x1: 260, y1: 212, x2: 260, y2: 300, label: "P" },
+              { t: "force", x1: 260, y1: 175, x2: 260, y2: 100, label: "N" },
+            ],
+          } },
         { q: "Бассейн заполнен водой до глубины 3 м. Найдите давление воды на дно и силу давления на дно площадью 20 м².",
           given: ["h = 3 м", "S = 20 м²", "ρ = 1000 кг/м³", "g = 10 Н/кг"], find: "p, F — ?",
           steps: ["p = ρ·g·h = 1000 · 10 · 3 = 30 000 Па.", "F = p·S = 30 000 · 20 = 600 000 Н."], answer: "p = 30 кПа, F = 600 кН." },
         { q: "Деревянный брусок плотностью 600 кг/м³ и объёмом 0,02 м³ плавает в воде. Какая часть объёма погружена и какова выталкивающая сила?",
           given: ["ρ = 600 кг/м³", "V = 0,02 м³", "ρ_в = 1000 кг/м³", "g = 10 Н/кг"], find: "доля, F_A — ?",
-          steps: ["F_A = P = ρ·V·g = 600 · 0,02 · 10 = 120 Н.", "V_погр = F_A /(ρ_в·g) = 120 /(1000·10) = 0,012 м³.", "доля = 0,012 / 0,02 = 0,6."], answer: "Погружено 60 %, F_A = 120 Н." },
+          steps: ["F_A = P = ρ·V·g = 600 · 0,02 · 10 = 120 Н.", "V_погр = F_A /(ρ_в·g) = 120 /(1000·10) = 0,012 м³.", "доля = 0,012 / 0,02 = 0,6."], answer: "Погружено 60 %, F_A = 120 Н.",
+          forceScene: {
+            given: "Брусок плавает, частично погружён в воду",
+            refItems: [
+              { t: "line", x1: 60, y1: 175, x2: 460, y2: 175 },
+              { t: "body", x1: 210, y1: 150, x2: 310, y2: 200, label: "m" },
+              { t: "force", x1: 260, y1: 175, x2: 260, y2: 255, label: "P" },
+              { t: "force", x1: 260, y1: 175, x2: 260, y2: 95, label: "Fа" },
+            ],
+          } },
         { q: "Кран поднял груз массой 500 кг на высоту 12 м за 20 с. КПД 80 %. Найдите полезную и затраченную работу и полезную мощность.",
           given: ["m = 500 кг", "h = 12 м", "t = 20 с", "КПД = 80 %", "g = 10"], find: "A_п, A_з, N — ?",
-          steps: ["A_п = m·g·h = 500 · 10 · 12 = 60 000 Дж.", "A_з = A_п / КПД = 60 000 / 0,8 = 75 000 Дж.", "N = A_п / t = 60 000 / 20 = 3000 Вт."], answer: "A_п = 60 кДж, A_з = 75 кДж, N = 3 кВт." },
+          steps: ["A_п = m·g·h = 500 · 10 · 12 = 60 000 Дж.", "A_з = A_п / КПД = 60 000 / 0,8 = 75 000 Дж.", "N = A_п / t = 60 000 / 20 = 3000 Вт."], answer: "A_п = 60 кДж, A_з = 75 кДж, N = 3 кВт.",
+          forceScene: {
+            given: "Груз равномерно поднимается краном на тросе",
+            refItems: [
+              { t: "line", x1: 260, y1: 40, x2: 260, y2: 130 },
+              { t: "body", x1: 220, y1: 150, x2: 300, y2: 210, label: "m" },
+              { t: "force", x1: 260, y1: 150, x2: 260, y2: 230, label: "P" },
+              { t: "force", x1: 260, y1: 150, x2: 260, y2: 65, label: "T" },
+            ],
+          } },
         { q: "На коротком плече рычага 0,4 м висит груз весом 600 Н, длинное плечо 1,2 м. Какую силу приложить к длинному плечу и какую работу она совершит, опустив конец на 0,3 м?",
           given: ["l₁ = 0,4 м", "P = 600 Н", "l₂ = 1,2 м", "s = 0,3 м"], find: "F, A — ?",
-          steps: ["F·l₂ = P·l₁ → F = 600 · 0,4 / 1,2 = 200 Н.", "A = F·s = 200 · 0,3 = 60 Дж."], answer: "F = 200 Н, A = 60 Дж." },
+          steps: ["F·l₂ = P·l₁ → F = 600 · 0,4 / 1,2 = 200 Н.", "A = F·s = 200 · 0,3 = 60 Дж."], answer: "F = 200 Н, A = 60 Дж.",
+          forceScene: {
+            given: "Рычаг: l₁ = 0,4 м (груз), l₂ = 1,2 м (сила)",
+            refItems: [
+              { t: "line", x1: 60, y1: 160, x2: 460, y2: 160 },
+              { t: "pulley", x1: 260, y1: 160, x2: 275, y2: 160 },
+              { t: "force", x1: 150, y1: 160, x2: 150, y2: 235, label: "P" },
+              { t: "force", x1: 400, y1: 160, x2: 400, y2: 85, label: "F" },
+            ],
+          } },
         { q: "Велосипедист 1200 м ехал со скоростью 6 м/с, затем 900 м со скоростью 9 м/с. Найдите время на каждом участке и среднюю скорость.",
           given: ["S₁ = 1200 м", "υ₁ = 6 м/с", "S₂ = 900 м", "υ₂ = 9 м/с"], find: "t₁, t₂, υ_ср — ?",
           steps: ["t₁ = 1200 / 6 = 200 с.", "t₂ = 900 / 9 = 100 с.", "υ_ср = (1200+900)/(200+100) = 2100/300 = 7 м/с."], answer: "t₁ = 200 с, t₂ = 100 с, υ_ср = 7 м/с." },
@@ -9777,10 +9986,28 @@ GAME.problems = {
           steps: ["p = F₁ / S₁ = 200 / 0,001 = 200 000 Па.", "F₂ = p·S₂ = 200 000 · 0,025 = 5000 Н."], answer: "p = 200 кПа, F₂ = 5000 Н." },
         { q: "Тело массой 2 кг падает без трения с высоты 5 м. Найдите потенциальную энергию вверху и кинетическую энергию у земли.",
           given: ["m = 2 кг", "h = 5 м", "g = 10"], find: "E_п, E_к — ?",
-          steps: ["E_п = m·g·h = 2 · 10 · 5 = 100 Дж.", "По закону сохранения энергии у земли E_к = E_п = 100 Дж."], answer: "E_п = 100 Дж, E_к = 100 Дж." },
+          steps: ["E_п = m·g·h = 2 · 10 · 5 = 100 Дж.", "По закону сохранения энергии у земли E_к = E_п = 100 Дж."], answer: "E_п = 100 Дж, E_к = 100 Дж.",
+          forceScene: {
+            given: "Тело свободно падает (сопротивлением пренебрегаем)",
+            refItems: [
+              { t: "dash", x1: 260, y1: 50, x2: 260, y2: 260 },
+              { t: "ball", x1: 260, y1: 130, x2: 288, y2: 130, label: "m" },
+              { t: "force", x1: 260, y1: 130, x2: 260, y2: 210, label: "P" },
+            ],
+          } },
         { q: "Льдина площадью 2 м² и толщиной 0,3 м (ρ = 900 кг/м³) плавает в воде. Найдите её массу и максимальный дополнительный груз, который она удержит. Выдержит ли человека массой 70 кг?",
           given: ["S = 2 м²", "h = 0,3 м", "ρ_л = 900", "ρ_в = 1000", "g = 10"], find: "m, груз — ?",
-          steps: ["V = S·h = 2 · 0,3 = 0,6 м³.", "m = ρ_л·V = 900 · 0,6 = 540 кг, вес 5400 Н.", "Макс. выталкивание (полное погружение): F = ρ_в·g·V = 1000·10·0,6 = 6000 Н.", "Запас = 6000 − 5400 = 600 Н → груз до 60 кг."], answer: "m = 540 кг; удержит до 60 кг, значит человека 70 кг не выдержит." },
+          steps: ["V = S·h = 2 · 0,3 = 0,6 м³.", "m = ρ_л·V = 900 · 0,6 = 540 кг, вес 5400 Н.", "Макс. выталкивание (полное погружение): F = ρ_в·g·V = 1000·10·0,6 = 6000 Н.", "Запас = 6000 − 5400 = 600 Н → груз до 60 кг."], answer: "m = 540 кг; удержит до 60 кг, значит человека 70 кг не выдержит.",
+          forceScene: {
+            given: "Льдина плавает, сверху дополнительный груз",
+            refItems: [
+              { t: "line", x1: 60, y1: 180, x2: 460, y2: 180 },
+              { t: "body", x1: 190, y1: 160, x2: 330, y2: 205, label: "льдина" },
+              { t: "body", x1: 235, y1: 120, x2: 285, y2: 160, label: "груз" },
+              { t: "force", x1: 260, y1: 180, x2: 260, y2: 260, label: "P общ" },
+              { t: "force", x1: 260, y1: 180, x2: 260, y2: 100, label: "Fа" },
+            ],
+          } },
         { q: "Насос мощностью 400 Вт поднимает воду на высоту 5 м (КПД 100 %). Какой объём воды он поднимет за 1 минуту?",
           given: ["N = 400 Вт", "h = 5 м", "t = 60 с", "g = 10", "ρ = 1000"], find: "V — ?",
           steps: ["A = N·t = 400 · 60 = 24 000 Дж.", "m = A /(g·h) = 24 000 /(10·5) = 480 кг.", "V = m / ρ = 480 / 1000 = 0,48 м³."], answer: "V = 0,48 м³ (480 л)." },
@@ -9789,7 +10016,16 @@ GAME.problems = {
           steps: ["m = ρ·V = 1000 · 0,2 = 200 кг.", "p = ρ·g·h = 1000 · 10 · 0,5 = 5000 Па.", "F = p·S = 5000 · 0,4 = 2000 Н."], answer: "m = 200 кг, p = 5000 Па, F = 2000 Н." },
         { q: "Кубик со стороной 10 см плавает в воде, погрузившись на 6 см. Найдите плотность материала кубика.",
           given: ["a = 0,1 м", "h_погр = 0,06 м", "ρ_в = 1000", "g = 10"], find: "ρ — ?",
-          steps: ["V = 0,1³ = 0,001 м³.", "V_погр = 0,1·0,1·0,06 = 0,0006 м³.", "F_A = ρ_в·g·V_погр = 1000·10·0,0006 = 6 Н = вес → m = 0,6 кг.", "ρ = m/V = 0,6/0,001 = 600 кг/м³."], answer: "ρ = 600 кг/м³." },
+          steps: ["V = 0,1³ = 0,001 м³.", "V_погр = 0,1·0,1·0,06 = 0,0006 м³.", "F_A = ρ_в·g·V_погр = 1000·10·0,0006 = 6 Н = вес → m = 0,6 кг.", "ρ = m/V = 0,6/0,001 = 600 кг/м³."], answer: "ρ = 600 кг/м³.",
+          forceScene: {
+            given: "Кубик плавает, погружён частично",
+            refItems: [
+              { t: "line", x1: 60, y1: 170, x2: 460, y2: 170 },
+              { t: "body", x1: 220, y1: 140, x2: 300, y2: 210, label: "a" },
+              { t: "force", x1: 260, y1: 170, x2: 260, y2: 250, label: "P" },
+              { t: "force", x1: 260, y1: 170, x2: 260, y2: 90, label: "Fа" },
+            ],
+          } },
       ],
     },
     {
@@ -9826,31 +10062,104 @@ GAME.problems = {
       problems: [
         { q: "На тело массой 4 кг действует направленная вверх сила 30 Н и сила тяжести. Найдите равнодействующую и направление.",
           given: ["m = 4 кг", "F = 30 Н вверх", "g = 10"], find: "R — ?",
-          steps: ["P = m·g = 40 Н вниз.", "R = 40 − 30 = 10 Н, вниз."], answer: "R = 10 Н, вниз." },
+          steps: ["P = m·g = 40 Н вниз.", "R = 40 − 30 = 10 Н, вниз."], answer: "R = 10 Н, вниз.",
+          forceScene: {
+            given: "Тело массой 4 кг, сила F=30Н вверх + тяжесть",
+            refItems: [
+              { t: "body", x1: 220, y1: 150, x2: 300, y2: 210, label: "m" },
+              { t: "force", x1: 260, y1: 150, x2: 260, y2: 230, label: "P" },
+              { t: "force", x1: 260, y1: 150, x2: 260, y2: 80, label: "F" },
+            ],
+          } },
         { q: "Пружина жёсткостью 200 Н/м растянута на 5 см. Найдите силу упругости.",
           given: ["k = 200 Н/м", "x = 0,05 м"], find: "F — ?",
-          steps: ["F = k·x = 200 · 0,05 = 10 Н."], answer: "F = 10 Н." },
+          steps: ["F = k·x = 200 · 0,05 = 10 Н."], answer: "F = 10 Н.",
+          forceScene: {
+            given: "Пружина растянута грузом",
+            refItems: [
+              { t: "spring", x1: 260, y1: 40, x2: 260, y2: 140 },
+              { t: "ball", x1: 260, y1: 160, x2: 292, y2: 160, label: "m" },
+              { t: "force", x1: 260, y1: 160, x2: 260, y2: 240, label: "P" },
+              { t: "force", x1: 260, y1: 160, x2: 260, y2: 80, label: "Fупр" },
+            ],
+          } },
         { q: "Под действием груза пружина (k = 250 Н/м) удлинилась на 4 см. Найдите массу груза.",
           given: ["k = 250 Н/м", "x = 0,04 м", "g = 10"], find: "m — ?",
-          steps: ["F = k·x = 250 · 0,04 = 10 Н.", "F = m·g → m = 10/10 = 1 кг."], answer: "m = 1 кг." },
+          steps: ["F = k·x = 250 · 0,04 = 10 Н.", "F = m·g → m = 10/10 = 1 кг."], answer: "m = 1 кг.",
+          forceScene: {
+            given: "Груз растягивает пружину",
+            refItems: [
+              { t: "spring", x1: 260, y1: 40, x2: 260, y2: 140 },
+              { t: "ball", x1: 260, y1: 160, x2: 292, y2: 160, label: "m" },
+              { t: "force", x1: 260, y1: 160, x2: 260, y2: 240, label: "P" },
+              { t: "force", x1: 260, y1: 160, x2: 260, y2: 80, label: "Fупр" },
+            ],
+          } },
         { q: "На движущееся тело действуют сила тяги 12 Н и направленная против движения сила трения 4 Н. Найдите равнодействующую силу и её направление.",
           given: ["F = 12 Н", "F_тр = 4 Н"], find: "R — ?",
-          steps: ["Силы направлены противоположно, поэтому вычитаем: R = 12 − 4 = 8 Н.", "Равнодействующая направлена в сторону большей силы — по направлению движения."], answer: "R = 8 Н, по направлению движения." },
+          steps: ["Силы направлены противоположно, поэтому вычитаем: R = 12 − 4 = 8 Н.", "Равнодействующая направлена в сторону большей силы — по направлению движения."], answer: "R = 8 Н, по направлению движения.",
+          forceScene: {
+            given: "Тело движется, F=12Н тяга, Fтр=4Н против движения",
+            refItems: [
+              { t: "ground", x1: 60, y1: 250, x2: 460, y2: 250 },
+              { t: "body", x1: 210, y1: 175, x2: 310, y2: 250, label: "m" },
+              { t: "force", x1: 310, y1: 212, x2: 400, y2: 212, label: "F" },
+              { t: "force", x1: 210, y1: 230, x2: 150, y2: 230, label: "Fтр" },
+              { t: "force", x1: 260, y1: 212, x2: 260, y2: 300, label: "P" },
+              { t: "force", x1: 260, y1: 175, x2: 260, y2: 100, label: "N" },
+            ],
+          } },
         { q: "Найдите силу тяжести на Луне для тела массой 6 кг (g_Луны = 1,6 Н/кг).",
           given: ["m = 6 кг", "g = 1,6 Н/кг"], find: "P — ?",
-          steps: ["P = m·g = 6 · 1,6 = 9,6 Н."], answer: "P = 9,6 Н." },
+          steps: ["P = m·g = 6 · 1,6 = 9,6 Н."], answer: "P = 9,6 Н.",
+          forceScene: {
+            given: "Тело на поверхности Луны",
+            refItems: [
+              { t: "ground", x1: 60, y1: 250, x2: 460, y2: 250 },
+              { t: "body", x1: 210, y1: 175, x2: 310, y2: 250, label: "m" },
+              { t: "force", x1: 260, y1: 212, x2: 260, y2: 270, label: "P" },
+              { t: "force", x1: 260, y1: 175, x2: 260, y2: 120, label: "N" },
+            ],
+          } },
         { q: "Тело весит 50 Н на Земле. Какова его масса и сколько оно будет весить на планете с g = 4 Н/кг?",
           given: ["P = 50 Н", "g = 10", "g₂ = 4"], find: "m, P₂ — ?",
-          steps: ["m = P/g = 50/10 = 5 кг.", "P₂ = m·g₂ = 5·4 = 20 Н."], answer: "m = 5 кг, P₂ = 20 Н." },
+          steps: ["m = P/g = 50/10 = 5 кг.", "P₂ = m·g₂ = 5·4 = 20 Н."], answer: "m = 5 кг, P₂ = 20 Н.",
+          forceScene: {
+            given: "Тело на опоре: сначала на Земле, потом на другой планете",
+            refItems: [
+              { t: "ground", x1: 60, y1: 250, x2: 460, y2: 250 },
+              { t: "body", x1: 210, y1: 175, x2: 310, y2: 250, label: "m" },
+              { t: "force", x1: 260, y1: 212, x2: 260, y2: 300, label: "P" },
+              { t: "force", x1: 260, y1: 175, x2: 260, y2: 100, label: "N" },
+            ],
+          } },
         { q: "Тело массой 5 кг висит неподвижно на нити. Найдите силу натяжения нити.",
           given: ["m = 5 кг", "тело в покое", "g = 10"], find: "T — ?",
-          steps: ["Тело в равновесии: нить удерживает вес тела, поэтому T = P = m·g.", "T = 5 · 10 = 50 Н."], answer: "T = 50 Н." },
+          steps: ["Тело в равновесии: нить удерживает вес тела, поэтому T = P = m·g.", "T = 5 · 10 = 50 Н."], answer: "T = 50 Н.",
+          forceScene: {
+            given: "Тело висит на нити неподвижно",
+            refItems: [
+              { t: "line", x1: 260, y1: 40, x2: 260, y2: 120 },
+              { t: "ball", x1: 260, y1: 140, x2: 292, y2: 140, label: "m" },
+              { t: "force", x1: 260, y1: 140, x2: 260, y2: 220, label: "P" },
+              { t: "force", x1: 260, y1: 140, x2: 260, y2: 65, label: "T" },
+            ],
+          } },
         { q: "Тело массой 500 г имеет объём 200 см³. Найдите плотность (в г/см³ и кг/м³) и определите, утонет ли оно в воде.",
           given: ["m = 500 г", "V = 200 см³", "ρ_в = 1000"], find: "ρ — ?",
           steps: ["ρ = m/V = 500/200 = 2,5 г/см³ = 2500 кг/м³.", "2500 > 1000 → утонет."], answer: "ρ = 2,5 г/см³ = 2500 кг/м³, утонет." },
         { q: "Брусок из дуба объёмом 0,05 м³ (ρ = 700 кг/м³). Найдите массу и вес.",
           given: ["V = 0,05 м³", "ρ = 700", "g = 10"], find: "m, P — ?",
-          steps: ["m = ρ·V = 700·0,05 = 35 кг.", "P = m·g = 350 Н."], answer: "m = 35 кг, P = 350 Н." },
+          steps: ["m = ρ·V = 700·0,05 = 35 кг.", "P = m·g = 350 Н."], answer: "m = 35 кг, P = 350 Н.",
+          forceScene: {
+            given: "Дубовый брусок лежит на столе",
+            refItems: [
+              { t: "ground", x1: 60, y1: 250, x2: 460, y2: 250 },
+              { t: "body", x1: 200, y1: 175, x2: 320, y2: 250, label: "m" },
+              { t: "force", x1: 260, y1: 212, x2: 260, y2: 300, label: "P" },
+              { t: "force", x1: 260, y1: 175, x2: 260, y2: 100, label: "N" },
+            ],
+          } },
       ],
     },
     {
@@ -9861,7 +10170,16 @@ GAME.problems = {
           steps: ["P = m·g = 36 Н.", "p₁ = 36/0,03 = 1200 Па.", "p₂ = 36/0,015 = 2400 Па."], answer: "p₁ = 1200 Па, p₂ = 2400 Па." },
         { q: "Тело объёмом 0,005 м³ полностью погружено. Найдите выталкивающую силу в воде и в керосине.",
           given: ["V = 0,005 м³", "ρ_в = 1000", "ρ_к = 800", "g = 10"], find: "F_в, F_к — ?",
-          steps: ["F_в = 1000·10·0,005 = 50 Н.", "F_к = 800·10·0,005 = 40 Н."], answer: "F_в = 50 Н, F_к = 40 Н." },
+          steps: ["F_в = 1000·10·0,005 = 50 Н.", "F_к = 800·10·0,005 = 40 Н."], answer: "F_в = 50 Н, F_к = 40 Н.",
+          forceScene: {
+            given: "Тело полностью погружено в жидкость",
+            refItems: [
+              { t: "line", x1: 60, y1: 100, x2: 460, y2: 100 },
+              { t: "ball", x1: 260, y1: 180, x2: 292, y2: 180, label: "V" },
+              { t: "force", x1: 260, y1: 180, x2: 260, y2: 250, label: "P" },
+              { t: "force", x1: 260, y1: 180, x2: 260, y2: 110, label: "Fа" },
+            ],
+          } },
         { q: "На какой глубине в воде давление воды равно нормальному атмосферному (100 кПа)?",
           given: ["p = 100 000 Па", "ρ = 1000", "g = 10"], find: "h — ?",
           steps: ["h = p/(ρ·g) = 100 000/(1000·10) = 10 м."], answer: "h = 10 м." },
@@ -9876,10 +10194,30 @@ GAME.problems = {
           steps: ["Выигрыш = S₂/S₁ = 80/4 = 20 раз.", "F₂ = F₁·20 = 120·20 = 2400 Н."], answer: "В 20 раз, F₂ = 2400 Н." },
         { q: "Тело объёмом 0,0015 м³ погрузили в воду наполовину. Найдите выталкивающую силу.",
           given: ["V = 0,0015 м³", "ρ = 1000", "g = 10"], find: "F_A — ?",
-          steps: ["V_погр = 0,00075 м³.", "F_A = 1000·10·0,00075 = 7,5 Н."], answer: "F_A = 7,5 Н." },
+          steps: ["V_погр = 0,00075 м³.", "F_A = 1000·10·0,00075 = 7,5 Н."], answer: "F_A = 7,5 Н.",
+          forceScene: {
+            given: "Тело погружено в воду наполовину",
+            refItems: [
+              { t: "line", x1: 60, y1: 175, x2: 460, y2: 175 },
+              { t: "body", x1: 220, y1: 150, x2: 300, y2: 210, label: "V" },
+              { t: "force", x1: 260, y1: 175, x2: 260, y2: 250, label: "P" },
+              { t: "force", x1: 260, y1: 175, x2: 260, y2: 100, label: "Fа" },
+            ],
+          } },
         { q: "Стальной шар весит в воздухе 78 Н, а в воде 68 Н. Найдите выталкивающую силу и объём шара.",
           given: ["P_возд = 78 Н", "P_вода = 68 Н", "ρ = 1000", "g = 10"], find: "F_A, V — ?",
-          steps: ["F_A = 78 − 68 = 10 Н.", "V = F_A/(ρ·g) = 10/10 000 = 0,001 м³."], answer: "F_A = 10 Н, V = 0,001 м³." },
+          steps: ["F_A = 78 − 68 = 10 Н.", "V = F_A/(ρ·g) = 10/10 000 = 0,001 м³."], answer: "F_A = 10 Н, V = 0,001 м³.",
+          forceScene: {
+            given: "Шар взвешен на динамометре сначала в воздухе, потом в воде",
+            refItems: [
+              { t: "spring", x1: 260, y1: 40, x2: 260, y2: 130 },
+              { t: "ball", x1: 260, y1: 155, x2: 288, y2: 155, label: "шар" },
+              { t: "force", x1: 260, y1: 155, x2: 260, y2: 230, label: "P" },
+              { t: "force", x1: 260, y1: 155, x2: 260, y2: 70, label: "T" },
+              { t: "force", x1: 260, y1: 155, x2: 260, y2: 190, label: "Fа" },
+              { t: "line", x1: 60, y1: 200, x2: 460, y2: 200 },
+            ],
+          } },
         { q: "Найдите давление воды на дно стакана высотой 12 см.",
           given: ["h = 0,12 м", "ρ = 1000", "g = 10"], find: "p — ?",
           steps: ["p = ρ·g·h = 1000·10·0,12 = 1200 Па."], answer: "p = 1200 Па." },
@@ -9890,13 +10228,34 @@ GAME.problems = {
       problems: [
         { q: "Брусок равномерно тянут по столу силой 25 Н на расстояние 8 м. Найдите работу тянущей силы и силу трения.",
           given: ["F = 25 Н", "s = 8 м", "движение равномерное"], find: "A, F_тр — ?",
-          steps: ["A = F·s = 25 · 8 = 200 Дж.", "При равномерном движении тянущая сила уравновешивает трение: F_тр = F = 25 Н."], answer: "A = 200 Дж, F_тр = 25 Н." },
+          steps: ["A = F·s = 25 · 8 = 200 Дж.", "При равномерном движении тянущая сила уравновешивает трение: F_тр = F = 25 Н."], answer: "A = 200 Дж, F_тр = 25 Н.",
+          forceScene: {
+            given: "Брусок равномерно тянут по столу",
+            refItems: [
+              { t: "ground", x1: 60, y1: 250, x2: 460, y2: 250 },
+              { t: "body", x1: 200, y1: 175, x2: 300, y2: 250, label: "m" },
+              { t: "force", x1: 300, y1: 212, x2: 390, y2: 212, label: "F" },
+              { t: "force", x1: 200, y1: 230, x2: 130, y2: 230, label: "Fтр" },
+              { t: "force", x1: 250, y1: 212, x2: 250, y2: 300, label: "P" },
+              { t: "force", x1: 250, y1: 175, x2: 250, y2: 100, label: "N" },
+            ],
+          } },
         { q: "Человек массой 60 кг поднялся по лестнице на 5 м за 10 с. Найдите работу и мощность.",
           given: ["m = 60 кг", "h = 5 м", "t = 10 с", "g = 10"], find: "A, N — ?",
           steps: ["A = m·g·h = 60·10·5 = 3000 Дж.", "N = A/t = 300 Вт."], answer: "A = 3000 Дж, N = 300 Вт." },
         { q: "Груз весом 200 Н втащили по гладкой наклонной плоскости длиной 4 м на высоту 1 м. Какую силу прикладывали вдоль плоскости?",
           given: ["P = 200 Н", "l = 4 м", "h = 1 м", "без трения"], find: "F — ?",
-          steps: ["Золотое правило: F·l = P·h.", "F = P·h/l = 200·1/4 = 50 Н."], answer: "F = 50 Н (выигрыш в 4 раза)." },
+          steps: ["Золотое правило: F·l = P·h.", "F = P·h/l = 200·1/4 = 50 Н."], answer: "F = 50 Н (выигрыш в 4 раза).",
+          forceScene: {
+            given: "Груз втаскивают по гладкой наклонной плоскости (l=4м, h=1м)",
+            refItems: [
+              { t: "incline", x1: 60, y1: 260, x2: 460, y2: 260 },
+              { t: "body", x1: 220, y1: 195, x2: 280, y2: 235, label: "P" },
+              { t: "force", x1: 250, y1: 215, x2: 340, y2: 165, label: "F" },
+              { t: "force", x1: 250, y1: 215, x2: 250, y2: 290, label: "P" },
+              { t: "force", x1: 250, y1: 215, x2: 220, y2: 155, label: "N" },
+            ],
+          } },
         { q: "Подъёмник поднимает 200 кг на 15 м. Какую работу он совершает?",
           given: ["m = 200 кг", "h = 15 м", "g = 10"], find: "A — ?",
           steps: ["A = m·g·h = 200·10·15 = 30 000 Дж."], answer: "A = 30 кДж." },
@@ -14685,30 +15044,88 @@ GAME.zadachnik.grade7 = {
         q: "Масса первого тела вдвое больше массы второго тела. На какое тело действует бо́льшая сила тяжести и во сколько раз?",
         hint: "Сила тяжести прямо пропорциональна массе тела.",
         options: ["На первое, в 2 раза", "На второе, в 2 раза", "Сила тяжести одинакова"], correct: 0,
-        s: "На первое, в 2 раза — сила тяжести растёт прямо пропорционально массе." },
+        s: "На первое, в 2 раза — сила тяжести растёт прямо пропорционально массе.",
+        forceScene: {
+          given: "m₁ = 2m₂ — оба тела на столе",
+          refItems: [
+            { t: "ground", x1: 40, y1: 250, x2: 480, y2: 250 },
+            { t: "body", x1: 90, y1: 175, x2: 200, y2: 250, label: "m₁" },
+            { t: "force", x1: 145, y1: 212, x2: 145, y2: 300, label: "m₁g" },
+            { t: "force", x1: 145, y1: 175, x2: 145, y2: 100, label: "N₁" },
+            { t: "body", x1: 340, y1: 205, x2: 410, y2: 250, label: "m₂" },
+            { t: "force", x1: 375, y1: 227, x2: 375, y2: 285, label: "m₂g" },
+            { t: "force", x1: 375, y1: 205, x2: 375, y2: 150, label: "N₂" },
+          ],
+        } },
       { tier: "base", kind: "num",
         q: "Найди силу тяжести, действующую на тело массой 12 кг (g = 10 Н/кг). Ответ в Н.",
         hint: "Сила тяжести — масса, умноженная на g.",
         answer: 120, unit: "Н", tol: 3,
-        s: "120 Н." },
+        s: "120 Н.",
+        forceScene: {
+          given: "m = 12 кг, g = 10 Н/кг",
+          refItems: [
+            { t: "ground", x1: 60, y1: 250, x2: 460, y2: 250 },
+            { t: "body", x1: 210, y1: 175, x2: 310, y2: 250, label: "m" },
+            { t: "force", x1: 260, y1: 212, x2: 260, y2: 300, label: "mg" },
+            { t: "force", x1: 260, y1: 175, x2: 260, y2: 100, label: "N" },
+          ],
+        } },
       { tier: "mid", kind: "open",
         q: "По закону всемирного тяготения между любыми телами действуют силы притяжения, которые тем больше, чем больше массы тел. Почему же подвешенная на шнуре люстра совсем не меняет положения, когда в комнату вносят массивный холодильник?",
         hint: "Сравни массу холодильника с массой Земли — и подумай, насколько мала сила притяжения между двумя обычными предметами по сравнению с притяжением к целой планете.",
-        a: "Сила гравитационного притяжения между обычными предметами (даже такими массивными, как холодильник) ничтожно мала по сравнению с силой притяжения Земли — заметить её без сверхточных приборов невозможно." },
+        a: "Сила гравитационного притяжения между обычными предметами (даже такими массивными, как холодильник) ничтожно мала по сравнению с силой притяжения Земли — заметить её без сверхточных приборов невозможно.",
+        forceScene: {
+          given: "Люстра висит на шнуре; в комнату вносят холодильник",
+          refItems: [
+            { t: "line", x1: 260, y1: 40, x2: 260, y2: 110 },
+            { t: "ball", x1: 260, y1: 130, x2: 292, y2: 130, label: "люстра" },
+            { t: "force", x1: 260, y1: 130, x2: 260, y2: 210, label: "mg" },
+            { t: "force", x1: 260, y1: 130, x2: 260, y2: 55, label: "T" },
+            { t: "ground", x1: 60, y1: 260, x2: 460, y2: 260 },
+            { t: "body", x1: 350, y1: 190, x2: 430, y2: 260, label: "холодильник" },
+          ],
+        } },
       { tier: "mid", kind: "mc",
         q: "Камень, брошенный вертикально вверх, летит вверх замедленно, а падает вниз ускоренно. Куда всё это время направлена сила тяжести?",
         hint: "Сила тяжести не меняет своего направления в зависимости от того, куда летит тело.",
         options: ["Всегда вниз, независимо от направления движения камня", "Сначала вниз, потом вверх"], correct: 0,
-        s: "Всегда вниз — именно поэтому она тормозит камень при подъёме и разгоняет при падении." },
+        s: "Всегда вниз — именно поэтому она тормозит камень при подъёме и разгоняет при падении.",
+        forceScene: {
+          given: "Камень в полёте (сопротивлением воздуха пренебрегаем)",
+          refItems: [
+            { t: "dash", x1: 260, y1: 60, x2: 260, y2: 260 },
+            { t: "ball", x1: 260, y1: 150, x2: 288, y2: 150, label: "" },
+            { t: "force", x1: 260, y1: 150, x2: 260, y2: 230, label: "mg" },
+          ],
+        } },
       { tier: "high", kind: "num",
         q: "Пружина жёсткостью 250 Н/м растянулась на 0,04 м под действием груза. Найди силу упругости. Ответ в Н.",
         hint: "Сила упругости пропорциональна удлинению — жёсткость и есть этот коэффициент пропорциональности.",
         answer: 10, unit: "Н", tol: 0.5,
-        s: "10 Н." },
+        s: "10 Н.",
+        forceScene: {
+          given: "k = 250 Н/м, x = 0,04 м",
+          refItems: [
+            { t: "spring", x1: 260, y1: 40, x2: 260, y2: 130 },
+            { t: "ball", x1: 260, y1: 150, x2: 292, y2: 150, label: "m" },
+            { t: "force", x1: 260, y1: 150, x2: 260, y2: 230, label: "mg" },
+            { t: "force", x1: 260, y1: 150, x2: 260, y2: 70, label: "Fупр" },
+          ],
+        } },
       { tier: "high", kind: "open",
         q: "Стреляя по отдалённой мишени, опытные стрелки целятся немного выше самой мишени, а не прямо в неё. Почему?",
         hint: "Пока пуля летит к мишени, на неё всё это время действует сила тяжести — подумай, что она делает с траекторией полёта.",
-        a: "Пока пуля летит, сила тяжести постоянно тянет её вниз, поэтому траектория немного провисает — прицеливание чуть выше компенсирует это провисание." },
+        a: "Пока пуля летит, сила тяжести постоянно тянет её вниз, поэтому траектория немного провисает — прицеливание чуть выше компенсирует это провисание.",
+        forceScene: {
+          given: "Пуля летит горизонтально к мишени",
+          refItems: [
+            { t: "dash", x1: 60, y1: 120, x2: 460, y2: 120 },
+            { t: "ball", x1: 100, y1: 120, x2: 118, y2: 120, label: "" },
+            { t: "force", x1: 100, y1: 120, x2: 100, y2: 190, label: "mg" },
+            { t: "body", x1: 430, y1: 150, x2: 460, y2: 230, label: "цель" },
+          ],
+        } },
     ],
   },
 
@@ -14719,30 +15136,83 @@ GAME.zadachnik.grade7 = {
         q: "Медальон висит на цепочке. На какое тело действует сила тяжести: на цепочку, на медальон, или на оба?",
         hint: "Сила тяжести действует абсолютно на любое тело, у которого есть масса — независимо от того, подвешено оно или нет.",
         options: ["На оба — и на цепочку, и на медальон", "Только на медальон"], correct: 0,
-        s: "На оба: сила тяжести действует на любое тело, обладающее массой." },
+        s: "На оба: сила тяжести действует на любое тело, обладающее массой.",
+        forceScene: {
+          given: "Медальон подвешен на цепочке",
+          refItems: [
+            { t: "line", x1: 260, y1: 40, x2: 260, y2: 120 },
+            { t: "ball", x1: 260, y1: 140, x2: 290, y2: 140, label: "медальон" },
+            { t: "force", x1: 260, y1: 140, x2: 260, y2: 220, label: "mg" },
+            { t: "force", x1: 260, y1: 140, x2: 260, y2: 65, label: "T" },
+          ],
+        } },
       { tier: "base", kind: "num",
         q: "Найди вес тела массой 9 кг на неподвижной опоре (g = 10). Ответ в Н.",
         hint: "На неподвижной опоре вес численно совпадает с силой тяжести.",
         answer: 90, unit: "Н", tol: 2,
-        s: "90 Н." },
+        s: "90 Н.",
+        forceScene: {
+          given: "m = 9 кг, опора неподвижна, g = 10 Н/кг",
+          refItems: [
+            { t: "ground", x1: 60, y1: 250, x2: 460, y2: 250 },
+            { t: "body", x1: 210, y1: 175, x2: 310, y2: 250, label: "m" },
+            { t: "force", x1: 260, y1: 212, x2: 260, y2: 300, label: "mg" },
+            { t: "force", x1: 260, y1: 175, x2: 260, y2: 100, label: "N" },
+          ],
+        } },
       { tier: "mid", kind: "mc",
         q: "Поднимаясь в скоростном лифте, человек ощущает, что его прижимает к полу сильнее обычного, а при спуске — наоборот, слабее. Что происходит с его весом при подъёме?",
         hint: "Вспомни: вес увеличивается, когда опора разгоняет тело вверх.",
         options: ["Увеличивается", "Уменьшается", "Не меняется"], correct: 0,
-        s: "Увеличивается — пол лифта давит на человека сильнее обычного." },
+        s: "Увеличивается — пол лифта давит на человека сильнее обычного.",
+        forceScene: {
+          given: "Лифт разгоняется вверх, человек стоит на полу лифта",
+          refItems: [
+            { t: "incline", x1: 190, y1: 40, x2: 340, y2: 280 },
+            { t: "body", x1: 230, y1: 150, x2: 300, y2: 260, label: "чел." },
+            { t: "force", x1: 265, y1: 200, x2: 265, y2: 285, label: "mg" },
+            { t: "force", x1: 265, y1: 150, x2: 265, y2: 70, label: "N" },
+          ],
+        } },
       { tier: "mid", kind: "open",
         q: "Могут ли существовать движения, при которых вес тела БОЛЬШЕ действующей на него силы тяжести? Приведи пример.",
         hint: "Вес увеличивается именно тогда, когда опора (или подвес) разгоняет тело вверх — то есть тело движется с ускорением, направленным вверх.",
-        a: "Да — например, при разгоне лифта вверх или на старте ракеты: тело движется с ускорением, направленным вверх, и опора давит на него сильнее, чем просто уравновешивая силу тяжести." },
+        a: "Да — например, при разгоне лифта вверх или на старте ракеты: тело движется с ускорением, направленным вверх, и опора давит на него сильнее, чем просто уравновешивая силу тяжести.",
+        forceScene: {
+          given: "Тело на полу кабины, кабина разгоняется вверх",
+          refItems: [
+            { t: "body", x1: 210, y1: 175, x2: 310, y2: 250, label: "m" },
+            { t: "force", x1: 260, y1: 212, x2: 260, y2: 300, label: "mg" },
+            { t: "force", x1: 260, y1: 175, x2: 260, y2: 90, label: "N" },
+            { t: "text", x1: 380, y1: 110, label: "N > mg" },
+          ],
+        } },
       { tier: "high", kind: "mc",
         q: "Груз взвесили на Земле обычными весами с гирями (сравнивающими массы) и отдельно пружинным динамометром — оба показали эквивалент 100 г. Тот же груз и оба прибора перенесли на Луну. Что покажут приборы теперь?",
         hint: "Весы с гирями сравнивают МАССЫ (не зависят от g), а динамометр измеряет ВЕС (силу, зависящую от g) — а на Луне g примерно в 6 раз меньше земного.",
         options: ["Весы с гирями по-прежнему покажут 100 г, а динамометр покажет заметно меньшее значение", "Оба прибора покажут прежний результат без изменений"], correct: 0,
-        s: "Масса (весы с гирями) от места не зависит, а вес (динамометр) на Луне намного меньше из-за меньшего g." },
+        s: "Масса (весы с гирями) от места не зависит, а вес (динамометр) на Луне намного меньше из-за меньшего g.",
+        forceScene: {
+          given: "Груз подвешен на пружинном динамометре",
+          refItems: [
+            { t: "spring", x1: 260, y1: 40, x2: 260, y2: 140 },
+            { t: "ball", x1: 260, y1: 160, x2: 292, y2: 160, label: "m" },
+            { t: "force", x1: 260, y1: 160, x2: 260, y2: 240, label: "mg" },
+            { t: "force", x1: 260, y1: 160, x2: 260, y2: 80, label: "Fупр" },
+          ],
+        } },
       { tier: "high", kind: "open",
         q: "Назови случаи, когда вес тела НЕ равен действующей на него силе тяжести.",
         hint: "Подумай про любые движения с ускорением, направленным вертикально — вверх или вниз.",
-        a: "Вес не равен силе тяжести всегда, когда тело вместе с опорой движется с вертикальным ускорением — например, в разгоняющемся или тормозящем лифте, на старте ракеты, при свободном падении (где вес вообще равен нулю — невесомость)." },
+        a: "Вес не равен силе тяжести всегда, когда тело вместе с опорой движется с вертикальным ускорением — например, в разгоняющемся или тормозящем лифте, на старте ракеты, при свободном падении (где вес вообще равен нулю — невесомость).",
+        forceScene: {
+          given: "Тело на опоре, опора движется с вертикальным ускорением",
+          refItems: [
+            { t: "body", x1: 210, y1: 175, x2: 310, y2: 250, label: "m" },
+            { t: "force", x1: 260, y1: 212, x2: 260, y2: 300, label: "mg" },
+            { t: "force", x1: 260, y1: 175, x2: 260, y2: 110, label: "N" },
+          ],
+        } },
     ],
   },
 
@@ -14753,32 +15223,91 @@ GAME.zadachnik.grade7 = {
         q: "Найди равнодействующую двух сил 12 Н и 16 Н, направленных в одну сторону вдоль одной прямой. Ответ в Н.",
         hint: "Силы в одну сторону вдоль одной прямой складывают.",
         answer: 28, unit: "Н", tol: 1,
-        s: "28 Н." },
+        s: "28 Н.",
+        forceScene: {
+          given: "F₁ = 12 Н, F₂ = 16 Н — обе вправо вдоль одной прямой",
+          refItems: [
+            { t: "body", x1: 220, y1: 130, x2: 300, y2: 190, label: "" },
+            { t: "force", x1: 260, y1: 160, x2: 360, y2: 160, label: "F₁" },
+            { t: "force", x1: 260, y1: 190, x2: 400, y2: 190, label: "F₂" },
+          ],
+        } },
       { tier: "base", kind: "mc",
         q: "Две силы 800 Н и 100 Н приложены к одной точке вдоль одной прямой, но в противоположные стороны. В какую сторону направлена их равнодействующая?",
         hint: "Равнодействующая двух противоположных сил всегда направлена в сторону той, что больше.",
         options: ["В сторону большей силы (800 Н)", "В сторону меньшей силы (100 Н)"], correct: 0,
-        s: "В сторону большей силы — 800 Н." },
+        s: "В сторону большей силы — 800 Н.",
+        forceScene: {
+          given: "F₁ = 800 Н (вправо), F₂ = 100 Н (влево), одна прямая",
+          refItems: [
+            { t: "body", x1: 220, y1: 140, x2: 300, y2: 200, label: "" },
+            { t: "force", x1: 300, y1: 170, x2: 440, y2: 170, label: "800 Н" },
+            { t: "force", x1: 220, y1: 170, x2: 130, y2: 170, label: "100 Н" },
+          ],
+        } },
       { tier: "mid", kind: "num",
         q: "Пароход равномерно тянет баржу, сопротивление воды движению которой равно 15 кН. С какой силой натянут буксирный канат? Ответ в кН.",
         hint: "При равномерном движении сила тяги уравновешивает силу сопротивления.",
         answer: 15, unit: "кН", tol: 0.5,
-        s: "15 кН." },
+        s: "15 кН.",
+        forceScene: {
+          given: "Баржа движется равномерно, сопротивление воды 15 кН",
+          refItems: [
+            { t: "body", x1: 230, y1: 150, x2: 380, y2: 210, label: "баржа" },
+            { t: "line", x1: 150, y1: 180, x2: 230, y2: 180 },
+            { t: "force", x1: 230, y1: 180, x2: 330, y2: 180, label: "T (канат)" },
+            { t: "force", x1: 380, y1: 180, x2: 300, y2: 180, label: "Fсопр" },
+          ],
+        } },
       { tier: "mid", kind: "num",
         q: "Силы 50 Н, 15 Н, 75 Н и 20 Н приложены к одной точке и направлены по одной прямой в одну сторону. Найди их равнодействующую. Ответ в Н.",
         hint: "Силы в одну сторону вдоль одной прямой просто складываются все вместе.",
         answer: 160, unit: "Н", tol: 2,
-        s: "160 Н." },
+        s: "160 Н.",
+        forceScene: {
+          given: "F₁=50 Н, F₂=15 Н, F₃=75 Н, F₄=20 Н — все вправо",
+          refItems: [
+            { t: "body", x1: 200, y1: 140, x2: 260, y2: 200, label: "" },
+            { t: "force", x1: 230, y1: 155, x2: 300, y2: 155, label: "F₁" },
+            { t: "force", x1: 230, y1: 170, x2: 340, y2: 170, label: "F₂" },
+            { t: "force", x1: 230, y1: 185, x2: 380, y2: 185, label: "F₃" },
+            { t: "force", x1: 230, y1: 200, x2: 420, y2: 200, label: "F₄" },
+          ],
+        } },
       { tier: "high", kind: "num",
         q: "Буксир тянет баржу тросом с силой 30 кН, сопротивление воды равно 30 кН — баржа движется равномерно. Сопротивление воды внезапно возросло до 34 кН, а сила тяги троса осталась прежней. Чему стала равна равнодействующая сила, действующая на баржу? Ответ в кН.",
         hint: "Равнодействующая — это разница между силой тяги и возросшим сопротивлением.",
         answer: 4, unit: "кН", tol: 0.5,
-        s: "4 кН, направлена против движения (баржа начнёт замедляться)." },
+        s: "4 кН, направлена против движения (баржа начнёт замедляться).",
+        forceScene: {
+          given: "Тяга троса 30 кН (осталась прежней), сопротивление возросло до 34 кН",
+          refItems: [
+            { t: "body", x1: 230, y1: 150, x2: 380, y2: 210, label: "баржа" },
+            { t: "line", x1: 150, y1: 180, x2: 230, y2: 180 },
+            { t: "force", x1: 230, y1: 180, x2: 320, y2: 180, label: "T=30кН" },
+            { t: "force", x1: 380, y1: 180, x2: 280, y2: 180, label: "Fс=34кН" },
+          ],
+        } },
       { tier: "high", kind: "mc",
         q: "Пароход тянет три одинаковые баржи, соединённые тросами друг за другом. Сопротивление воды движению каждой баржи — 15 кН. С какой силой натянут первый (головной) буксирный канат — тот, что соединяет пароход с первой баржей?",
         hint: "Первый трос должен преодолевать сопротивление воды сразу для ВСЕХ трёх барж, которые он тянет за собой, а не только для одной.",
         options: ["45 кН — он тянет сразу все три баржи", "15 кН — как и для одной баржи"], correct: 0,
-        s: "45 кН: головной трос передаёт усилие, необходимое для преодоления сопротивления сразу всех трёх барж (15 × 3)." },
+        s: "45 кН: головной трос передаёт усилие, необходимое для преодоления сопротивления сразу всех трёх барж (15 × 3).",
+        forceScene: {
+          given: "3 баржи цепочкой, сопротивление каждой — 15 кН",
+          refItems: [
+            { t: "line", x1: 60, y1: 160, x2: 110, y2: 160 },
+            { t: "body", x1: 110, y1: 135, x2: 190, y2: 185, label: "б.1" },
+            { t: "force", x1: 60, y1: 160, x2: 130, y2: 160, label: "T₁" },
+            { t: "line", x1: 190, y1: 160, x2: 230, y2: 160 },
+            { t: "body", x1: 230, y1: 135, x2: 310, y2: 185, label: "б.2" },
+            { t: "line", x1: 310, y1: 160, x2: 350, y2: 160 },
+            { t: "body", x1: 350, y1: 135, x2: 430, y2: 185, label: "б.3" },
+            { t: "force", x1: 150, y1: 220, x2: 150, y2: 200, label: "Fс₁" },
+            { t: "force", x1: 270, y1: 220, x2: 270, y2: 200, label: "Fс₂" },
+            { t: "force", x1: 390, y1: 220, x2: 390, y2: 200, label: "Fс₃" },
+          ],
+        } },
     ],
   },
 
@@ -15237,6 +15766,230 @@ GAME.zadachnik.grade7 = {
   },
 
 };
+
+/* ============================================================
+   ФизМат RPG — graphs.js
+   Полноценная canvas-лаборатория «Построй график» — по той же
+   архитектуре, что уже обкатана в forces.js: window.GraphLab.mount()
+   создаёт живой canvas с перетаскиванием, window.GraphLab.evaluate()
+   честно сверяет ученический график с эталонным. В отличие от
+   первой SVG-версии (точки только в узлах сетки), здесь построение
+   полностью свободное: тап по пустому месту ставит точку именно
+   туда, где коснулись, а не в ближайший узел; уже поставленную
+   точку можно перетащить пальцем/мышью в любое новое место.
+   ============================================================ */
+(function () {
+  window.GAME = window.GAME || {};
+
+  const HANDLE_R = 22; // радиус захвата точки (px canvas-координат) — с запасом под палец
+
+  /* ---------- сценарии (7 класс: графики скорости и пути) ---------- */
+  GAME.graphScenarios = [
+    { id: "car_uniform", grade: 7, kind: "v", title: "Автомобиль едет с постоянной скоростью",
+      desc: "Автомобиль едет по прямой трассе с постоянной скоростью 8 м/с в течение 5 секунд, не разгоняясь и не тормозя.",
+      xLabel: "t, с", yLabel: "υ, м/с", xMax: 5, yMax: 8, tol: 0.7,
+      correct: [{ x: 0, y: 8 }, { x: 5, y: 8 }],
+      explain: "Скорость не меняется всё время — на графике скорости это горизонтальная прямая на высоте 8, без единого изгиба." },
+    { id: "cyclist_from_rest", grade: 7, kind: "v", title: "Велосипедист трогается с места",
+      desc: "Велосипедист начинает движение из состояния покоя и за 4 секунды равномерно разгоняется до скорости 8 м/с.",
+      xLabel: "t, с", yLabel: "υ, м/с", xMax: 4, yMax: 8, tol: 0.7,
+      correct: [{ x: 0, y: 0 }, { x: 4, y: 8 }],
+      explain: "Скорость растёт равномерно от нуля — прямая линия, идущая из начала координат (0; 0) наклонно вверх к точке (4; 8)." },
+    { id: "walker_home", grade: 7, kind: "s", title: "Пешеход идёт домой",
+      desc: "Пешеход равномерно идёт домой и за 4 секунды проходит 8 метров.",
+      xLabel: "t, с", yLabel: "S, м", xMax: 4, yMax: 8, tol: 0.7,
+      correct: [{ x: 0, y: 0 }, { x: 4, y: 8 }],
+      explain: "Путь равномерно растёт от нуля — одна прямая наклонная линия из начала координат до точки (4; 8)." },
+    { id: "sled_speed_then_steady", grade: 7, kind: "v", title: "Санки разгоняются, потом катятся ровно",
+      desc: "Санки 2 секунды равномерно разгоняются от 0 до 4 м/с, а затем ещё 2 секунды катятся с этой постоянной скоростью, не ускоряясь.",
+      xLabel: "t, с", yLabel: "υ, м/с", xMax: 4, yMax: 4, tol: 0.5,
+      correct: [{ x: 0, y: 0 }, { x: 2, y: 4 }, { x: 4, y: 4 }],
+      explain: "Первые 2 с скорость растёт от 0 до 4 (наклонная линия из начала координат). Следующие 2 с скорость не меняется — горизонтальный отрезок на высоте 4." },
+    { id: "train_braking", grade: 7, kind: "v", title: "Поезд подъезжает к станции",
+      desc: "Поезд идёт 3 секунды с постоянной скоростью 8 м/с, а затем начинает равномерно тормозить и полностью останавливается ещё через 3 секунды.",
+      xLabel: "t, с", yLabel: "υ, м/с", xMax: 6, yMax: 8, tol: 0.7,
+      correct: [{ x: 0, y: 8 }, { x: 3, y: 8 }, { x: 6, y: 0 }],
+      explain: "Первые 3 с скорость постоянна (горизонталь на высоте 8). Дальше она равномерно падает до нуля — наклонная линия вниз, доходящая точно до оси времени на 6-й секунде." },
+    { id: "ball_sand_stop", grade: 7, kind: "v", title: "Шарик закатывается в песок",
+      desc: "Шарик катится 4 секунды со скоростью 6 м/с по ровному полу, а затем закатывается в песок и резко останавливается всего за 1 секунду.",
+      xLabel: "t, с", yLabel: "υ, м/с", xMax: 5, yMax: 6, tol: 0.6,
+      correct: [{ x: 0, y: 6 }, { x: 4, y: 6 }, { x: 5, y: 0 }],
+      explain: "Первые 4 с скорость постоянна — горизонталь на высоте 6. Последнюю секунду скорость резко и круто падает до нуля — короткий, почти отвесный отрезок вниз." },
+    { id: "runner_two_pace", grade: 7, kind: "s", title: "Бегун меняет темп",
+      desc: "Бегун первые 2 секунды бежит равномерно и проходит 3 м, а затем ускоряется и за следующие 2 секунды проходит ещё 7 м с новой, более высокой постоянной скоростью.",
+      xLabel: "t, с", yLabel: "S, м", xMax: 4, yMax: 10, tol: 0.8,
+      correct: [{ x: 0, y: 0 }, { x: 2, y: 3 }, { x: 4, y: 10 }],
+      explain: "Первые 2 с путь растёт медленнее (до 3 м) — линия положе. Дальше бегун ускорился, и путь за то же время нарастает быстрее (ещё 7 м за 2 с) — вторая линия круче первой." },
+    { id: "elevator_stops", grade: 7, kind: "s", title: "Лифт останавливается на этажах",
+      desc: "Лифт 1 секунду стоял на месте, затем 3 секунды равномерно поднимался и проехал 6 м, а после снова 1 секунду стоял неподвижно.",
+      xLabel: "t, с", yLabel: "S, м", xMax: 5, yMax: 6, tol: 0.7,
+      correct: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 4, y: 6 }, { x: 5, y: 6 }],
+      explain: "Стоит — путь не растёт (горизонталь на нуле). Едет — путь равномерно растёт (наклонная линия). Снова стоит — опять горизонталь, уже на высоте 6." },
+    { id: "rocket_speeding_up", grade: 7, kind: "v", title: "Ракета набирает скорость",
+      desc: "Ракета 3 секунды равномерно разгоняется от 0 до 10 м/с, а затем следующие 2 секунды летит с этой постоянной скоростью, не ускоряясь дальше.",
+      xLabel: "t, с", yLabel: "υ, м/с", xMax: 5, yMax: 10, tol: 0.8,
+      correct: [{ x: 0, y: 0 }, { x: 3, y: 10 }, { x: 5, y: 10 }],
+      explain: "Первые 3 с скорость растёт от нуля до 10 — наклонная линия. Следующие 2 с она не меняется — горизонтальный отрезок на высоте 10." },
+    { id: "plane_landing", grade: 7, kind: "v", title: "Самолёт после посадки тормозит",
+      desc: "После посадки самолёт катится по полосе 2 секунды со скоростью 10 м/с, а затем равномерно тормозит и полностью останавливается ещё через 4 секунды.",
+      xLabel: "t, с", yLabel: "υ, м/с", xMax: 6, yMax: 10, tol: 0.8,
+      correct: [{ x: 0, y: 10 }, { x: 2, y: 10 }, { x: 6, y: 0 }],
+      explain: "Первые 2 с скорость постоянна — горизонталь на высоте 10. Дальше она равномерно снижается до нуля за 4 секунды — пологая наклонная линия вниз." },
+    { id: "turtle_rest", grade: 7, kind: "s", title: "Черепаха ползёт и отдыхает",
+      desc: "Черепаха 3 секунды равномерно ползла и проползла 3 м, а затем сделала передышку и простояла на месте ещё 2 секунды.",
+      xLabel: "t, с", yLabel: "S, м", xMax: 5, yMax: 3, tol: 0.5,
+      correct: [{ x: 0, y: 0 }, { x: 3, y: 3 }, { x: 5, y: 3 }],
+      explain: "Пока ползёт — путь растёт равномерно (наклонная линия). Во время отдыха путь не меняется вообще — горизонтальный отрезок на прежней высоте 3." },
+    { id: "car_full_accel", grade: 7, kind: "v", title: "Автомобиль разгоняется всё время",
+      desc: "Автомобиль трогается с места и все 5 секунд равномерно разгоняется, достигнув в итоге скорости 10 м/с.",
+      xLabel: "t, с", yLabel: "υ, м/с", xMax: 5, yMax: 10, tol: 0.8,
+      correct: [{ x: 0, y: 0 }, { x: 5, y: 10 }],
+      explain: "Одна сплошная наклонная линия из начала координат (0; 0) до точки (5; 10) — скорость растёт равномерно на всём пути без единого излома." },
+    { id: "drone_hover_fly", grade: 7, kind: "s", title: "Дрон зависает и летит",
+      desc: "Дрон завис на месте на 1 секунду, затем 2 секунды летел вперёд и пролетел 10 м, а после снова завис на месте на 1 секунду.",
+      xLabel: "t, с", yLabel: "S, м", xMax: 4, yMax: 10, tol: 0.8,
+      correct: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 3, y: 10 }, { x: 4, y: 10 }],
+      explain: "Зависание — путь не растёт (горизонталь на нуле). Полёт — путь равномерно растёт (крутая наклонная линия, ведь 10 м всего за 2 с). Снова зависание — горизонталь на высоте 10." },
+    { id: "boat_engine_off", grade: 7, kind: "v", title: "Лодка глушит мотор",
+      desc: "Моторная лодка идёт 2 секунды со скоростью 6 м/с, затем мотор глушат, и лодка ещё 4 секунды равномерно тормозит о воду, останавливаясь полностью.",
+      xLabel: "t, с", yLabel: "υ, м/с", xMax: 6, yMax: 6, tol: 0.6,
+      correct: [{ x: 0, y: 6 }, { x: 2, y: 6 }, { x: 6, y: 0 }],
+      explain: "Первые 2 с скорость постоянна — горизонталь на высоте 6. Дальше она плавно и равномерно снижается до нуля за 4 секунды — пологая линия вниз, более полога, чем у резко тормозящих тел." },
+  ];
+
+  function graphSample(pts, x) {
+    for (let k = 0; k < pts.length - 1; k++) {
+      const a = pts[k], c = pts[k + 1];
+      if ((x >= a.x && x <= c.x) || (x >= c.x && x <= a.x)) {
+        if (c.x === a.x) return a.y;
+        return a.y + (c.y - a.y) * (x - a.x) / (c.x - a.x);
+      }
+    }
+    return null;
+  }
+  function evaluate(scenario, points) {
+    let hits = 0, total = 0;
+    for (let gx = 0; gx <= scenario.xMax; gx += 0.5) {
+      const cy = graphSample(scenario.correct, gx);
+      if (cy == null) continue;
+      total++;
+      const sy = graphSample(points, gx);
+      if (sy != null && Math.abs(sy - cy) <= (scenario.tol || 0.6)) hits++;
+    }
+    const pct = total ? hits / total : 0;
+    return { pct: Math.round(pct * 100), good: pct >= 0.85 };
+  }
+
+  /* mount(container, scenario, opts) — opts.interactive=true даёт живое
+     построение (тап ставит новую точку, перетаскивание двигает старую);
+     opts.studentPoints — уже построенная (или сохранённая) линия ученика;
+     opts.showCorrect — поверх рисуется пунктиром эталонная линия. */
+  function mount(container, scenario, opts) {
+    opts = opts || {};
+    const interactive = !!opts.interactive;
+    const w = Math.max(260, Math.min(520, container.clientWidth || 300));
+    const h = Math.round(w * 0.72);
+    container.innerHTML = `<canvas class="graph-canvas" width="${w}" height="${h}"></canvas>`;
+    const canvas = container.querySelector(".graph-canvas");
+    const ctx = canvas.getContext("2d");
+
+    const padL = 38, padB = 26, padT = 10, padR = 10;
+    const gw = w - padL - padR, gh = h - padT - padB;
+    const sx = (x) => padL + (x / scenario.xMax) * gw;
+    const sy = (y) => h - padB - (y / scenario.yMax) * gh;
+    const isx = (px) => ((px - padL) / gw) * scenario.xMax;
+    const isy = (py) => ((h - padB - py) / gh) * scenario.yMax;
+    const clampSnap = (v, max) => Math.round(Math.max(0, Math.min(max, v)) * 20) / 20; // шаг 0,05 — почти свободно, но без дребезга
+
+    let points = (opts.studentPoints || []).map((p) => ({ x: p.x, y: p.y }));
+
+    function drawLine(pts, color, dashed, width) {
+      if (pts.length < 2) return;
+      ctx.strokeStyle = color; ctx.lineWidth = width || 3;
+      ctx.setLineDash(dashed ? [7, 5] : []);
+      ctx.beginPath();
+      pts.forEach((p, i) => { const X = sx(p.x), Y = sy(p.y); if (i === 0) ctx.moveTo(X, Y); else ctx.lineTo(X, Y); });
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, w, h);
+      ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.lineWidth = 1;
+      for (let gx = 0; gx <= scenario.xMax; gx++) { ctx.beginPath(); ctx.moveTo(sx(gx), padT); ctx.lineTo(sx(gx), h - padB); ctx.stroke(); }
+      for (let gy = 0; gy <= scenario.yMax; gy++) { ctx.beginPath(); ctx.moveTo(padL, sy(gy)); ctx.lineTo(w - padR, sy(gy)); ctx.stroke(); }
+      ctx.strokeStyle = "rgba(255,255,255,0.42)"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(padL, padT); ctx.lineTo(padL, h - padB); ctx.lineTo(w - padR, h - padB); ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.font = "11px 'Rubik', sans-serif";
+      ctx.textAlign = "right"; ctx.fillText(scenario.xLabel, w - padR, h - padB + 17);
+      ctx.textAlign = "left"; ctx.fillText(scenario.yLabel, 2, padT + 9);
+
+      if (opts.showCorrect) drawLine(scenario.correct, "#4ade80", true, 2.5);
+      drawLine(points, "#38e1ff", false, 3);
+      points.forEach((p) => {
+        ctx.beginPath(); ctx.arc(sx(p.x), sy(p.y), interactive ? 7 : 5, 0, Math.PI * 2);
+        ctx.fillStyle = "#38e1ff"; ctx.fill();
+        ctx.strokeStyle = "#0a0e27"; ctx.lineWidth = 1.5; ctx.stroke();
+      });
+    }
+
+    let dragIdx = null;
+    function posFromEvt(e) {
+      const r = canvas.getBoundingClientRect();
+      const cx = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+      const cy = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+      return { x: cx * (canvas.width / r.width), y: cy * (canvas.height / r.height) };
+    }
+    function findPointAt(p) {
+      let best = -1, bd = HANDLE_R * HANDLE_R;
+      points.forEach((pt, i) => {
+        const d = (sx(pt.x) - p.x) ** 2 + (sy(pt.y) - p.y) ** 2;
+        if (d < bd) { bd = d; best = i; }
+      });
+      return best;
+    }
+    function onDown(e) {
+      const p = posFromEvt(e);
+      const idx = findPointAt(p);
+      if (idx >= 0) { dragIdx = idx; e.preventDefault(); return; }
+      const x = clampSnap(isx(p.x), scenario.xMax);
+      const y = clampSnap(isy(p.y), scenario.yMax);
+      points.push({ x, y });
+      draw();
+      e.preventDefault();
+    }
+    function onMove(e) {
+      if (dragIdx == null) return;
+      const p = posFromEvt(e);
+      const x = clampSnap(isx(p.x), scenario.xMax);
+      const y = clampSnap(isy(p.y), scenario.yMax);
+      points[dragIdx] = { x, y };
+      draw();
+      e.preventDefault();
+    }
+    function onUp() { dragIdx = null; }
+    if (interactive) {
+      canvas.addEventListener("mousedown", onDown); canvas.addEventListener("mousemove", onMove); window.addEventListener("mouseup", onUp);
+      canvas.addEventListener("touchstart", onDown, { passive: false }); canvas.addEventListener("touchmove", onMove, { passive: false }); window.addEventListener("touchend", onUp);
+    }
+
+    draw();
+    return {
+      draw,
+      getPoints: () => points.map((p) => ({ x: p.x, y: p.y })),
+      setPoints: (pts) => { points = pts.map((p) => ({ x: p.x, y: p.y })); draw(); },
+      undo: () => { points.pop(); draw(); },
+      reset: () => { points = []; draw(); },
+      destroy() {
+        if (!interactive) return;
+        canvas.removeEventListener("mousedown", onDown); canvas.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp);
+        canvas.removeEventListener("touchstart", onDown); canvas.removeEventListener("touchmove", onMove); window.removeEventListener("touchend", onUp);
+      },
+    };
+  }
+
+  window.GraphLab = { mount, evaluate };
+})();
 
 /* ============================================================
    ФизМат RPG — art.js
@@ -16199,6 +16952,373 @@ if (typeof window !== "undefined" && window.REALM_ART) {
   }
 
   window.Forces = { mount, evaluate, wrapCanvasText, ANGLE_TOL };
+})();
+
+/* ============================================================
+   ФизМат RPG — свободный редактор сил («как на ЕГЭ»)
+   ------------------------------------------------------------
+   Второй, ДОПОЛНИТЕЛЬНЫЙ режим практики «Расставь силы» —
+   рядом с готовым режимом «выбери из пула + перетащи наконечник»
+   (см. выше window.Forces). Здесь ученик рисует всё САМ на чистом
+   поле: векторы сил произвольной длины и направления, тела, опоры,
+   пружины, нити, блоки, оси, углы, подписи — свободным
+   инструментом, как это требуется в критериях ЕГЭ по физике
+   (часть 2, задачи с рисунком сил). Никакого выбора из готового
+   набора — только чистое поле и палитра инструментов.
+
+   Архитектурно не связан с движком canvas-drag выше: работает на
+   SVG, хранит список нарисованных элементов как данные, ничего не
+   проверяет автоматически (свободное рисование принципиально не
+   имеет единственного «правильного» пикселя — сверяться нужно с
+   эталонной диаграммой рядом, которую строит существующий режим
+   пула через setAllCorrect()). Это тот же принцип, что и в
+   fizika-ege (Draw.editor), перенесённый без внешних зависимостей
+   (там, где было хранилище/иконки — здесь инлайновые эмодзи и
+   сохранение в State, если он доступен).
+   ============================================================ */
+(function () {
+  window.GAME = window.GAME || {};
+  const NS = "http://www.w3.org/2000/svg";
+  const FW = 520, FH = 320; // внутренняя система координат холста (масштабируется через viewBox)
+
+  function fe(tag, attrs, kids) {
+    const n = document.createElementNS(NS, tag);
+    if (attrs) Object.keys(attrs).forEach((k) => {
+      if (attrs[k] === null || attrs[k] === undefined) return;
+      n.setAttribute(k, String(attrs[k]));
+    });
+    (Array.isArray(kids) ? kids : kids ? [kids] : []).forEach((c) => c && n.appendChild(c));
+    return n;
+  }
+  function ftxt(x, y, str, opts) {
+    const o = opts || {};
+    return fe("text", {
+      x, y, "font-size": o.size || 14, "font-style": o.italic === false ? "normal" : "italic",
+      "text-anchor": o.anchor || "middle", fill: "currentColor", "font-family": "Rubik, sans-serif",
+    }, [document.createTextNode(str)]);
+  }
+
+  /* ---------- примитивы чертежа (те же виды объектов, что и в эталонных схемах ЕГЭ) ---------- */
+  function fVec(x1, y1, x2, y2, label, dashed) {
+    const g = fe("g");
+    const a = Math.atan2(y2 - y1, x2 - x1);
+    const hl = 9, hw = 4.5;
+    g.appendChild(fe("line", { x1, y1, x2, y2, stroke: "currentColor", "stroke-width": 2.5, "stroke-dasharray": dashed ? "5 4" : null }));
+    g.appendChild(fe("path", {
+      d: `M ${x2} ${y2} L ${x2 - hl * Math.cos(a) + hw * Math.sin(a)} ${y2 - hl * Math.sin(a) - hw * Math.cos(a)} L ${x2 - hl * Math.cos(a) - hw * Math.sin(a)} ${y2 - hl * Math.sin(a) + hw * Math.cos(a)} Z`,
+      fill: "currentColor",
+    }));
+    if (label) { const off = 14; g.appendChild(ftxt(x2 + off * Math.cos(a), y2 + off * Math.sin(a) + 4, label, { size: 13 })); }
+    return g;
+  }
+  function fGround(x1, y1, x2, y2, flip) {
+    const g = fe("g");
+    g.appendChild(fe("line", { x1, y1, x2, y2, stroke: "currentColor", "stroke-width": 2 }));
+    const len = Math.hypot(x2 - x1, y2 - y1) || 1;
+    const ux = (x2 - x1) / len, uy = (y2 - y1) / len;
+    const nx = -uy * (flip ? -1 : 1), ny = ux * (flip ? -1 : 1);
+    for (let d = 4; d < len; d += 9) {
+      const px = x1 + ux * d, py = y1 + uy * d;
+      g.appendChild(fe("line", { x1: px, y1: py, x2: px + nx * 7 - ux * 5, y2: py + ny * 7 - uy * 5, stroke: "currentColor", "stroke-width": 1, opacity: 0.65 }));
+    }
+    return g;
+  }
+  function fBody(x, y, w, h, label) {
+    const g = fe("g");
+    g.appendChild(fe("rect", { x, y, width: w, height: h, rx: 3, fill: "none", stroke: "currentColor", "stroke-width": 2 }));
+    if (label) g.appendChild(ftxt(x + w / 2, y + h / 2 + 5, label, { size: 13 }));
+    return g;
+  }
+  function fBall(cx, cy, r, label) {
+    const g = fe("g");
+    g.appendChild(fe("circle", { cx, cy, r, fill: "none", stroke: "currentColor", "stroke-width": 2 }));
+    if (label) g.appendChild(ftxt(cx, cy + 5, label, { size: 13 }));
+    return g;
+  }
+  function fLine(x1, y1, x2, y2, dashed) {
+    return fe("line", { x1, y1, x2, y2, stroke: "currentColor", "stroke-width": 2, "stroke-dasharray": dashed ? "5 4" : null });
+  }
+  function fSpring(x1, y1, x2, y2) {
+    const len = Math.hypot(x2 - x1, y2 - y1) || 1;
+    const ux = (x2 - x1) / len, uy = (y2 - y1) / len;
+    const nx = -uy, ny = ux;
+    const coils = Math.max(4, Math.round(len / 14));
+    const lead = 8;
+    let d = `M ${x1} ${y1} L ${x1 + ux * lead} ${y1 + uy * lead}`;
+    const seg = (len - 2 * lead) / coils;
+    for (let i = 0; i < coils; i++) {
+      const t0 = lead + seg * i, tm = t0 + seg / 2, t1 = t0 + seg;
+      const sgn = i % 2 === 0 ? 1 : -1;
+      d += ` L ${x1 + ux * tm + nx * 7 * sgn} ${y1 + uy * tm + ny * 7 * sgn}`;
+      d += ` L ${x1 + ux * t1} ${y1 + uy * t1}`;
+    }
+    d += ` L ${x2} ${y2}`;
+    return fe("path", { d, fill: "none", stroke: "currentColor", "stroke-width": 2 });
+  }
+  function fPulley(cx, cy, r) {
+    const g = fe("g");
+    g.appendChild(fe("circle", { cx, cy, r, fill: "none", stroke: "currentColor", "stroke-width": 2 }));
+    g.appendChild(fe("circle", { cx, cy, r: 2, fill: "currentColor" }));
+    return g;
+  }
+  function fArc(cx, cy, r, a1, a2, label) {
+    const g = fe("g");
+    const p1x = cx + r * Math.cos(a1), p1y = cy + r * Math.sin(a1);
+    const p2x = cx + r * Math.cos(a2), p2y = cy + r * Math.sin(a2);
+    g.appendChild(fe("path", { d: `M ${p1x} ${p1y} A ${r} ${r} 0 0 ${a2 > a1 ? 1 : 0} ${p2x} ${p2y}`, fill: "none", stroke: "currentColor", "stroke-width": 1.4 }));
+    if (label) { const am = (a1 + a2) / 2; g.appendChild(ftxt(cx + (r + 13) * Math.cos(am), cy + (r + 13) * Math.sin(am) + 4, label, { size: 13 })); }
+    return g;
+  }
+
+  /* ---------- палитра инструментов и подписей ---------- */
+  const FDRAW_TOOLS = [
+    { id: "force", ico: "➜", name: "вектор силы" },
+    { id: "body", ico: "▭", name: "тело" },
+    { id: "ball", ico: "○", name: "шар" },
+    { id: "ground", ico: "▤", name: "опора" },
+    { id: "incline", ico: "◺", name: "наклонная плоскость" },
+    { id: "spring", ico: "〰", name: "пружина" },
+    { id: "pulley", ico: "◎", name: "блок" },
+    { id: "line", ico: "／", name: "нить" },
+    { id: "dash", ico: "┄", name: "штриховая линия" },
+    { id: "arc", ico: "◠", name: "угол" },
+    { id: "text", ico: "T", name: "подпись" },
+    { id: "erase", ico: "✕", name: "удалить элемент" },
+  ];
+  const FDRAW_LABELS = ["mg", "N", "T", "F", "Fтр", "Fупр", "FA", "a", "v", "α", "m", ""];
+
+  /* ============================================================
+     mountFreeEditor(container, opts)
+     Монтирует свободный SVG-редактор в container.
+     opts.storageKey — если задан и в проекте есть глобальный State
+                        с полем State.data (обычный object, который
+                        хост сам сохраняет через State.save()) —
+                        черновик рисунка переживёт перезагрузку
+                        экрана практики (не обязательно).
+     Возвращает { destroy() } — на симметрию с window.Forces.mount.
+     ============================================================ */
+  function mountFreeEditor(container, opts) {
+    opts = opts || {};
+    const storageKey = opts.storageKey || null;
+    const readOnly = !!opts.readOnly;
+    const stateBag = (window.State && window.State.data) || null;
+
+    let items = [];
+    if (opts.initialItems) {
+      // эталонная (readOnly) схема — задаётся сценарием задачи напрямую,
+      // черновик ученика при этом не читаем и не трогаем.
+      items = JSON.parse(JSON.stringify(opts.initialItems));
+    } else if (storageKey && stateBag && stateBag.forceFreeDrafts && stateBag.forceFreeDrafts[storageKey]) {
+      try { items = JSON.parse(stateBag.forceFreeDrafts[storageKey]); } catch (e) { items = []; }
+    }
+    const undoStack = [];
+    let tool = "force", label = "mg";
+
+    const root = document.createElement("div");
+    root.className = "draw" + (readOnly ? " draw--readonly" : "");
+
+    let btns = {}, labelRow = null, custom = null, undoBtn = null, clearBtn = null, hint = null;
+
+    if (!readOnly) {
+      const bar = document.createElement("div");
+      bar.className = "draw__bar";
+      FDRAW_TOOLS.forEach((t) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "draw__tool" + (t.id === tool ? " is-on" : "");
+        b.title = t.name; b.setAttribute("aria-label", t.name);
+        b.textContent = t.ico;
+        b.addEventListener("click", () => {
+          tool = t.id;
+          Object.keys(btns).forEach((k) => btns[k].classList.toggle("is-on", k === tool));
+          labelRow.style.display = (tool === "force" || tool === "text" || tool === "arc" || tool === "body" || tool === "ball") ? "" : "none";
+        });
+        btns[t.id] = b;
+        bar.appendChild(b);
+      });
+      root.appendChild(bar);
+
+      labelRow = document.createElement("div");
+      labelRow.className = "draw__labels";
+      const lbtns = {};
+      FDRAW_LABELS.forEach((L) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "draw__label" + (L === label ? " is-on" : "");
+        b.textContent = L === "" ? "без подписи" : L;
+        b.addEventListener("click", () => {
+          label = L;
+          Object.keys(lbtns).forEach((k) => lbtns[k].classList.toggle("is-on", k === L));
+          custom.value = "";
+        });
+        lbtns[L] = b;
+        labelRow.appendChild(b);
+      });
+      custom = document.createElement("input");
+      custom.className = "draw__custom"; custom.placeholder = "своя подпись"; custom.maxLength = 12;
+      custom.addEventListener("input", () => {
+        label = custom.value;
+        Object.keys(lbtns).forEach((k) => lbtns[k].classList.remove("is-on"));
+      });
+      labelRow.appendChild(custom);
+      root.appendChild(labelRow);
+    }
+
+    const svg = fe("svg", { viewBox: `0 0 ${FW} ${FH}`, class: "draw__svg draw__canvas" });
+    const wrap = document.createElement("div");
+    wrap.className = "draw__wrap";
+    wrap.appendChild(svg);
+    root.appendChild(wrap);
+
+    if (!readOnly) {
+      const foot = document.createElement("div");
+      foot.className = "draw__foot";
+      undoBtn = document.createElement("button");
+      undoBtn.type = "button"; undoBtn.className = "btn btn-ghost"; undoBtn.textContent = "↺ Отменить";
+      clearBtn = document.createElement("button");
+      clearBtn.type = "button"; clearBtn.className = "btn btn-ghost"; clearBtn.textContent = "🗑 Очистить";
+      hint = document.createElement("span");
+      hint.className = "draw__hint";
+      foot.appendChild(undoBtn); foot.appendChild(clearBtn); foot.appendChild(hint);
+      root.appendChild(foot);
+    }
+
+    container.innerHTML = "";
+    container.appendChild(root);
+
+    function persist() {
+      if (readOnly || !storageKey || !stateBag) return;
+      stateBag.forceFreeDrafts = stateBag.forceFreeDrafts || {};
+      stateBag.forceFreeDrafts[storageKey] = JSON.stringify(items);
+      if (window.State && typeof window.State.save === "function") { try { window.State.save(); } catch (e) {} }
+    }
+    function pushUndo() { undoStack.push(JSON.stringify(items)); if (undoStack.length > 40) undoStack.shift(); }
+
+    if (!readOnly) {
+      undoBtn.addEventListener("click", () => {
+        if (!undoStack.length) return;
+        items = JSON.parse(undoStack.pop());
+        render(); persist();
+      });
+      clearBtn.addEventListener("click", () => {
+        if (!items.length) return;
+        pushUndo(); items = []; render(); persist();
+      });
+    }
+
+    function renderItem(it) {
+      switch (it.t) {
+        case "force": return fVec(it.x1, it.y1, it.x2, it.y2, it.label);
+        case "body": return fBody(Math.min(it.x1, it.x2), Math.min(it.y1, it.y2), Math.abs(it.x2 - it.x1), Math.abs(it.y2 - it.y1), it.label);
+        case "ball": return fBall(it.x1, it.y1, Math.max(8, Math.hypot(it.x2 - it.x1, it.y2 - it.y1)), it.label);
+        case "ground": return fGround(it.x1, it.y1, it.x2, it.y2, it.flip);
+        case "incline": return fe("path", { d: `M ${it.x1} ${it.y2} L ${it.x2} ${it.y2} L ${it.x2} ${it.y1} Z`, fill: "none", stroke: "currentColor", "stroke-width": 2 });
+        case "spring": return fSpring(it.x1, it.y1, it.x2, it.y2);
+        case "pulley": return fPulley(it.x1, it.y1, Math.max(10, Math.hypot(it.x2 - it.x1, it.y2 - it.y1)));
+        case "line": return fLine(it.x1, it.y1, it.x2, it.y2, false);
+        case "dash": return fLine(it.x1, it.y1, it.x2, it.y2, true);
+        case "arc": {
+          const r = Math.max(20, Math.hypot(it.x2 - it.x1, it.y2 - it.y1));
+          const a2 = Math.atan2(it.y2 - it.y1, it.x2 - it.x1);
+          return fArc(it.x1, it.y1, r, 0, a2, it.label || "α");
+        }
+        case "text": return ftxt(it.x1, it.y1, it.label || "?", { size: 15, italic: false });
+      }
+      return null;
+    }
+
+    let preview = null;
+    function render() {
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      const grid = fe("g", { opacity: 0.12 });
+      for (let x = 0; x <= FW; x += 26) grid.appendChild(fe("line", { x1: x, y1: 0, x2: x, y2: FH, stroke: "currentColor", "stroke-width": 0.6 }));
+      for (let y = 0; y <= FH; y += 26) grid.appendChild(fe("line", { x1: 0, y1: y, x2: FW, y2: y, stroke: "currentColor", "stroke-width": 0.6 }));
+      svg.appendChild(grid);
+      items.forEach((it, i) => {
+        const node = renderItem(it);
+        if (!node) return;
+        node.setAttribute("data-i", String(i));
+        if (!readOnly) node.style.cursor = tool === "erase" ? "not-allowed" : "default";
+        svg.appendChild(node);
+      });
+      if (preview) svg.appendChild(preview);
+      if (hint) hint.textContent = items.length ? `Элементов: ${items.length}` : "Выбери инструмент и проведи по полю.";
+    }
+
+    function pt(ev) {
+      const r = svg.getBoundingClientRect();
+      const cx = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+      const cy = (ev.touches ? ev.touches[0].clientY : ev.clientY) - r.top;
+      return { x: Math.round((cx / r.width) * FW), y: Math.round((cy / r.height) * FH) };
+    }
+
+    let start = null;
+    function onDown(ev) {
+      ev.preventDefault();
+      const p = pt(ev);
+      if (tool === "erase") {
+        let node = ev.target;
+        while (node && node !== svg && !node.getAttribute?.("data-i")) node = node.parentNode;
+        const idx = node && node.getAttribute ? Number(node.getAttribute("data-i")) : -1;
+        if (idx >= 0 && !isNaN(idx)) { pushUndo(); items.splice(idx, 1); render(); persist(); }
+        return;
+      }
+      if (tool === "text") {
+        const t = (label || custom.value || "").trim();
+        if (!t) { hint.textContent = "Введи подпись в поле рядом с палитрой."; return; }
+        pushUndo(); items.push({ t: "text", x1: p.x, y1: p.y, label: t }); render(); persist();
+        return;
+      }
+      start = p;
+      try { ev.target.setPointerCapture && ev.target.setPointerCapture(ev.pointerId); } catch (e) {}
+    }
+    function onMoveEvt(ev) {
+      if (!start) return;
+      const p = pt(ev);
+      preview = renderItem({ t: tool, x1: start.x, y1: start.y, x2: p.x, y2: p.y, label });
+      if (preview) preview.setAttribute("opacity", "0.55");
+      render();
+      ev.preventDefault();
+    }
+    function finish(ev) {
+      if (!start) return;
+      const p = pt(ev);
+      preview = null;
+      const dist = Math.hypot(p.x - start.x, p.y - start.y);
+      const minimal = { pulley: true, ball: true };
+      if (dist < 6 && !minimal[tool]) { start = null; render(); return; }
+      pushUndo();
+      items.push({ t: tool, x1: start.x, y1: start.y, x2: p.x, y2: p.y, label });
+      start = null;
+      render(); persist();
+    }
+    function onCancel() { start = null; preview = null; render(); }
+
+    if (!readOnly) {
+      svg.addEventListener("pointerdown", onDown);
+      svg.addEventListener("pointermove", onMoveEvt);
+      svg.addEventListener("pointerup", finish);
+      svg.addEventListener("pointercancel", onCancel);
+    }
+
+    render();
+    return {
+      render,
+      hasContent: () => items.length > 0,
+      itemCount: () => items.length,
+      getItems: () => JSON.parse(JSON.stringify(items)),
+      clear() { if (readOnly) return; items = []; render(); persist(); },
+      destroy() {
+        if (readOnly) return;
+        svg.removeEventListener("pointerdown", onDown);
+        svg.removeEventListener("pointermove", onMoveEvt);
+        svg.removeEventListener("pointerup", finish);
+        svg.removeEventListener("pointercancel", onCancel);
+      },
+    };
+  }
+
+  window.ForceFreeDraw = { mount: mountFreeEditor };
 })();
 
 /* ============================================================
@@ -17462,8 +18582,10 @@ if (typeof window !== "undefined" && window.REALM_ART) {
     trFb: null,       // фидбек тренажёра: { checked, correct, val }
     fb: {},           // временный фидбек по заданиям: ключ -> {choice}
     zadFb: {},         // временный фидбек по задачам Задачника: probKey -> {checked, correct, pick, revealed}
+    probFb: {},        // шаг «нарисуй силы» в Комплексных задачах: "setId:i" -> {drawDone}
     forceFb: {},       // конструктор сил: fbKey -> {placed:[{label,dir}], selected, checked}
-    graphFb: {},       // конструктор графиков: fbKey -> {points:[{x,y}], checked}
+    graphFb: {},       // конструктор графиков (внутри теории): fbKey -> {points:[{x,y}], checked}
+    graphLab: null,    // отдельный раздел «Построй график»: {scenarioId, points, checked}
     forces: null,     // активная практика "Расставь силы": { scenarioId, on:{}, checked, correct }
     drillFb: {},      // фидбек интерактивных тренировок внутри учебника: "missionKey:blockIndex" -> {checked, correct}
     control: null,    // активный итоговый контроль темы: { key } — какая тема сейчас проверяется
@@ -17563,7 +18685,22 @@ if (typeof window !== "undefined" && window.REALM_ART) {
 
   function parseNum(s) {
     if (s == null) return NaN;
-    return parseFloat(String(s).replace(",", ".").replace(/\s/g, "").replace("−", "-"));
+    let str = String(s).trim();
+    // Разные виды тире/минуса, которые может подставить автозамена телефона
+    // или копирование текста откуда-то: обычный минус, юникодный минус
+    // (U+2212), en-dash, em-dash — все считаем знаком «минус».
+    str = str.replace(/[\u2212\u2013\u2014]/g, "-");
+    str = str.replace(/\s/g, "");
+    // Запятая как десятичный разделитель: берём только ПЕРВУЮ, остальные
+    // (если ученик случайно ввёл что-то вроде "1,2,3") отбрасываем вместе с
+    // хвостом после них — это лучше, чем молча превращать "1,2,3" в 1.2.
+    const firstComma = str.indexOf(",");
+    if (firstComma !== -1) {
+      const rest = str.slice(firstComma + 1);
+      if (rest.indexOf(",") !== -1) return NaN; // больше одной запятой — ввод некорректен
+      str = str.slice(0, firstComma) + "." + rest;
+    }
+    return parseFloat(str);
   }
   function checkNum(val, ans, tol) {
     if (isNaN(val)) return false;
@@ -17693,7 +18830,15 @@ if (typeof window !== "undefined" && window.REALM_ART) {
          <button class="btn btn-primary" data-cel-close>Продолжить</button>
        </div>`;
     document.body.appendChild(ov);
-    sparks(); confetti(40);
+    // Визуальные эффекты не должны блокировать критическую логику (кнопку
+    // закрытия, дальнейшие render() у вызывающего кода). Если что-то в sparks()
+    // или confetti() бросит исключение (например, окружение без Web Animations
+    // API), это раньше обрывало showNextCelebrate() ДО того, как навешивалась
+    // кнопка "Продолжить" — оверлей оставался нерабочим, а вызвавший код (сдача
+    // контроля темы, победа над боссом и т.п.) не успевал дойти до render()
+    // с результатом, хотя прогресс уже был сохранён в State.
+    try { sparks(); } catch (e) {}
+    try { confetti(40); } catch (e) {}
     const close = () => { ov.remove(); showNextCelebrate(); };
     ov.querySelector("[data-cel-close]").addEventListener("click", close);
     ov.addEventListener("click", (e) => { if (e.target === ov) close(); });
@@ -17701,18 +18846,22 @@ if (typeof window !== "undefined" && window.REALM_ART) {
   function sparks() {
     const colors = ["#38e1ff", "#a06bff", "#ffd166", "#ff5d8f", "#4ade80"];
     for (let i = 0; i < 18; i++) {
-      const s = document.createElement("div");
-      s.className = "spark";
-      s.style.background = pick(colors);
-      s.style.left = (50 + (Math.random() * 40 - 20)) + "%";
-      s.style.top = "45%";
-      document.body.appendChild(s);
-      const dx = (Math.random() * 2 - 1) * 240, dy = (Math.random() * -1 - 0.2) * 260;
-      s.animate(
-        [{ transform: "translate(0,0) rotate(0)", opacity: 1 },
-         { transform: `translate(${dx}px,${dy + 200}px) rotate(${Math.random() * 540}deg)`, opacity: 0 }],
-        { duration: 900 + Math.random() * 500, easing: "cubic-bezier(.2,.7,.3,1)" }
-      ).onfinish = () => s.remove();
+      try {
+        const s = document.createElement("div");
+        s.className = "spark";
+        s.style.background = pick(colors);
+        s.style.left = (50 + (Math.random() * 40 - 20)) + "%";
+        s.style.top = "45%";
+        document.body.appendChild(s);
+        const dx = (Math.random() * 2 - 1) * 240, dy = (Math.random() * -1 - 0.2) * 260;
+        const anim = s.animate(
+          [{ transform: "translate(0,0) rotate(0)", opacity: 1 },
+           { transform: `translate(${dx}px,${dy + 200}px) rotate(${Math.random() * 540}deg)`, opacity: 0 }],
+          { duration: 900 + Math.random() * 500, easing: "cubic-bezier(.2,.7,.3,1)" }
+        );
+        if (anim) anim.onfinish = () => s.remove();
+        else s.remove(); // окружение без Web Animations API — не оставляем висящий элемент
+      } catch (e) {} // единичный сбойный спарк не должен прерывать остальные 17
     }
   }
 
@@ -17720,36 +18869,43 @@ if (typeof window !== "undefined" && window.REALM_ART) {
   function flushEvents() {
     const events = State.takeEvents();
     for (const e of events) {
-      if (e.type === "levelup") {
-        enqueueCelebrate({ emoji: "🎚️", title: `Уровень ${e.payload.level}!`, sub: e.payload.title, mentor: pick(GAME.mentor.lines.levelUp) });
-        tone("win");
-      } else if (e.type === "achievement") {
-        tone("achieve");
-        toast({ ico: e.payload.icon, strong: "Достижение получено!", sub: e.payload.title, cls: "gold", ttl: 3600 });
-      } else if (e.type === "topicComplete") {
-        const r = e.payload.reward || {};
-        toast({ ico: "🏁", strong: "Тема пройдена!", sub: r.xp ? `+${r.xp} XP, +${r.coins} монет` : "", cls: "green", ttl: 3200 });
-        mentorSay(pick(GAME.mentor.lines.topicDone));
-      } else if (e.type === "bossWin") {
-        const t = topic(e.payload.topicId);
-        enqueueCelebrate({ emoji: "👑", title: "Босс повержен!", sub: t ? t.boss.title : "", mentor: pick(GAME.mentor.lines.bossWin) });
-        tone("win");
-      } else if (e.type === "item") {
-        toast({ ico: e.payload.icon, strong: "Получен артефакт!", sub: e.payload.name, cls: "gold", ttl: 3600 });
-      } else if (e.type === "missionComplete") {
-        const r = e.payload.reward || {};
-        toast({ ico: "🎯", strong: "Миссия пройдена!", sub: r.xp ? `+${r.xp} XP, +${r.coins} монет` : "", cls: "green", ttl: 3200 });
-        mentorSay(pick(GAME.mentor.lines.topicDone));
-      } else if (e.type === "chapterComplete") {
-        const r = e.payload.reward || {};
-        enqueueCelebrate({
-          emoji: "🏆",
-          title: "Глава пройдена!",
-          sub: e.payload.title + (r.xp ? ` · +${r.xp} XP, +${r.coins} монет` : ""),
-          mentor: pick(GAME.mentor.lines.bossWin),
-        });
-        tone("win");
-      }
+      // Один сбойный обработчик события (например, ошибка в визуальном эффекте
+      // празднования) не должен блокировать ни остальные события в очереди, ни,
+      // что важнее, возврат управления вызывающему коду — иначе критичные шаги
+      // после flushEvents() (обычно render() с результатом) просто не выполнятся,
+      // хотя прогресс в State уже сохранён. См. историю с sparks()/animate().
+      try {
+        if (e.type === "levelup") {
+          enqueueCelebrate({ emoji: "🎚️", title: `Уровень ${e.payload.level}!`, sub: e.payload.title, mentor: pick(GAME.mentor.lines.levelUp) });
+          tone("win");
+        } else if (e.type === "achievement") {
+          tone("achieve");
+          toast({ ico: e.payload.icon, strong: "Достижение получено!", sub: e.payload.title, cls: "gold", ttl: 3600 });
+        } else if (e.type === "topicComplete") {
+          const r = e.payload.reward || {};
+          toast({ ico: "🏁", strong: "Тема пройдена!", sub: r.xp ? `+${r.xp} XP, +${r.coins} монет` : "", cls: "green", ttl: 3200 });
+          mentorSay(pick(GAME.mentor.lines.topicDone));
+        } else if (e.type === "bossWin") {
+          const t = topic(e.payload.topicId);
+          enqueueCelebrate({ emoji: "👑", title: "Босс повержен!", sub: t ? t.boss.title : "", mentor: pick(GAME.mentor.lines.bossWin) });
+          tone("win");
+        } else if (e.type === "item") {
+          toast({ ico: e.payload.icon, strong: "Получен артефакт!", sub: e.payload.name, cls: "gold", ttl: 3600 });
+        } else if (e.type === "missionComplete") {
+          const r = e.payload.reward || {};
+          toast({ ico: "🎯", strong: "Миссия пройдена!", sub: r.xp ? `+${r.xp} XP, +${r.coins} монет` : "", cls: "green", ttl: 3200 });
+          mentorSay(pick(GAME.mentor.lines.topicDone));
+        } else if (e.type === "chapterComplete") {
+          const r = e.payload.reward || {};
+          enqueueCelebrate({
+            emoji: "🏆",
+            title: "Глава пройдена!",
+            sub: e.payload.title + (r.xp ? ` · +${r.xp} XP, +${r.coins} монет` : ""),
+            mentor: pick(GAME.mentor.lines.bossWin),
+          });
+          tone("win");
+        }
+      } catch (err) {}
     }
   }
 
@@ -17924,7 +19080,7 @@ if (typeof window !== "undefined" && window.REALM_ART) {
   }
 
   function tabsHTML() {
-    const gradeViews = ["grade", "worlds", "chapters", "practice", "problems", "zadachnik", "zadachnik-topic", "exam", "realm", "course", "course-mission", "trainer", "scene", "adventure", "topic", "world", "map"];
+    const gradeViews = ["grade", "worlds", "chapters", "practice", "problems", "zadachnik", "zadachnik-topic", "forces", "graphs", "constellations", "exam", "realm", "course", "course-mission", "trainer", "scene", "adventure", "topic", "world", "map"];
     const inGrade = gradeViews.indexOf(ui.view) >= 0;
     const g = (n, ico) => `<button class="tab ${inGrade && ui.gradeSel === n ? "active" : ""}" data-act="open-grade" data-grade="${n}">
          <span class="ico">${ico}</span><span>${n} класс</span></button>`;
@@ -18468,7 +19624,9 @@ if (typeof window !== "undefined" && window.REALM_ART) {
     if (conf === "low" && ok) return "Ты сомневался, а получилось — доверяй своим рассуждениям чуть больше.";
     if (conf === "high" && ok) return "Уверенность оправдалась — похоже, тема действительно понята.";
     if (conf === "low" && !ok) return "Ты сам почувствовал, что не уверен, — и не зря: это тоже полезный сигнал.";
-    return ""; // средняя уверенность — не самый показательный случай, отдельной заметки не нужно
+    if (conf === "mid" && ok) return "Ты сомневался, но решил верно — значит, опора уже есть, просто её стоит замечать за собой.";
+    if (conf === "mid" && !ok) return "Сомнение было оправданным — разберись в разборе ниже, и в следующий раз уверенности будет больше.";
+    return "";
   }
 
   function courseData() { return GAME.course && GAME.course["grade" + ui.gradeSel]; }
@@ -19080,12 +20238,12 @@ if (typeof window !== "undefined" && window.REALM_ART) {
           const attrs = fb.answered ? "" : `data-act="control-mc" data-key="${fbKey}" data-i="${i}" data-idx="${oi}"`;
           return `<button class="${cls}" ${attrs} ${fb.answered ? "disabled" : ""}>${esc(o)}</button>`;
         }).join("");
-        const compass = (fb.answered && !fb.ok && it.hint) ? `<div class="compass-hint">🧭 Компас: ${esc(it.hint)}</div>` : "";
+        const compass = (fb.answered && !fb.ok) ? `<div class="compass-hint">🧭 Компас: ${esc(it.hint || "Перечитай условие ещё раз — какая формула или закон здесь подходит?")}</div>` : "";
         return `<div class="th-ctrl-card"><div class="tr-q">${i + 1}. ${esc(it.q)}</div><div class="th-mistake-opts">${opts}</div>${compass}</div>`;
       }
       return `<div class="th-ctrl-card"><div class="tr-q">${i + 1}. ${esc(it.q)}</div>
           ${fb.answered
-            ? `<div class="tr-fb ${fb.ok ? "ok" : "bad"}">${fb.ok ? "✔ Верно" : "✗ Ответ: " + esc(String(it.answer)) + " " + esc(it.unit || "")}</div>${(!fb.ok && it.hint) ? `<div class="compass-hint">🧭 Компас: ${esc(it.hint)}</div>` : ""}`
+            ? `<div class="tr-fb ${fb.ok ? "ok" : "bad"}">${fb.ok ? "✔ Верно" : "✗ Ответ: " + esc(String(it.answer)) + " " + esc(it.unit || "")}</div>${!fb.ok ? `<div class="compass-hint">🧭 Компас: ${esc(it.hint || "Перечитай условие ещё раз — какая формула или закон здесь подходит?")}</div>` : ""}`
             : `<div class="answer-row">
                 <input id="ctrl-inp-${i}" class="th-drill-input" inputmode="decimal" autocomplete="off" placeholder="Ответ">
                 ${it.unit ? `<span class="unit">${esc(it.unit)}</span>` : ""}
@@ -19317,6 +20475,9 @@ if (typeof window !== "undefined" && window.REALM_ART) {
     if (zadTopics.length) cards += card(`data-act="open-zadachnik"`, "mc-combo", "📚", "Задачник", "Ещё задачи по каждой теме — на закрепление", `${zadCount} задач`);
     const forceScenarios = (GAME.forceScenarios || []).filter((s) => s.grade === g);
     if (forceScenarios.length) cards += card(`data-act="open-forces"`, "mc-forces", "⚖️", "Расставь силы", "Диаграммы сил: выбери силы из пула", `${forceScenarios.length} сценариев`);
+    const graphScenarios = (GAME.graphScenarios || []).filter((s) => s.grade === g);
+    if (graphScenarios.length) cards += card(`data-act="open-graphs"`, "mc-forces", "📈", "Построй график", "Пустая сетка — сам ставишь точки, без готового чертежа", `${graphScenarios.length} сценариев`);
+    if (g === 7) cards += card(`data-act="open-constellations"`, "mc-lab", "🌌", "Созвездия", "Прогресс всего 7 класса в звёздах", "");
     if (examQs.length) cards += card(`data-act="open-exam"`, "mc-exam", "📝", "Экзамен", "Случайные задачи на очки и время", "режим");
     cards += card(`data-act="go" data-view="cabinet"`, "mc-lab", "🔬", "Лаборатория", "Герой, открытия, достижения", "");
 
@@ -19403,9 +20564,25 @@ if (typeof window !== "undefined" && window.REALM_ART) {
       const probs = set.problems.map((p, i) => {
         const given = (p.given || []).join("; ");
         const steps = (p.steps || []).map((x) => `<div class="prob-step">${esc(x)}</div>`).join("");
+        const probKey = set.id + ":" + i;
+        const pfb = ui.probFb[probKey] || {};
+
+        // Рисунок сил показан сразу над задачей, «Дано · Решение · Ответ» доступно
+        // тут же рядом — без промежуточного «Готово»: рисуешь и сверяешься с решением
+        // в любом порядке и темпе.
+        const forceDrawBlock = p.forceScene
+          ? `<div class="zad-force-step">
+               <div class="gh-sub">✏️ Нарисуй силы, действующие на тело в этой задаче.</div>
+               <div class="force-free-wrap" id="prob-force-draw-${esc(probKey).replace(/[^a-zA-Z0-9]/g, "_")}" data-probkey="${esc(probKey)}"></div>
+             </div>`
+          : "";
+        const forceReview = p.forceScene ? renderZadForceReview(p, "prob:" + probKey, pfb, "prob-force-rate") : "";
+
         return `<div class="prob">
             <div class="prob-q"><span class="prob-n">${i + 1}</span>${esc(p.q)}</div>
+            ${forceDrawBlock}
             <details class="prob-sol"><summary>Дано · Решение · Ответ</summary>
+              ${forceReview}
               <div class="prob-block"><b>Дано:</b> ${esc(given)}</div>
               ${p.find ? `<div class="prob-block"><b>Найти:</b> ${esc(p.find)}</div>` : ""}
               <div class="prob-block"><b>Решение:</b>${steps}</div>
@@ -19464,18 +20641,30 @@ if (typeof window !== "undefined" && window.REALM_ART) {
       const solved = State.isZadDone(probKey);
       const fb = ui.zadFb[probKey] || {};
       const doneMark = solved ? `<span class="zad-done-mark">✅</span>` : "";
+      const isAnswered = p.kind === "num" ? (solved || fb.correct) : p.kind === "mc" ? (solved || fb.checked) : (solved || fb.revealed);
+
+      // Рисунок сил показывается ОДНИМ экраном вместе с полем ответа (не отдельным
+      // шагом до него) — так проверка рисунка и ответа происходит по одной и той же
+      // кнопке «Проверить», без промежуточного «Готово».
+      const forceDrawBlock = (p.forceScene && !isAnswered)
+        ? `<div class="zad-force-step">
+             <div class="gh-sub">✏️ Нарисуй силы, действующие на тело в этой задаче.</div>
+             <div class="force-free-wrap" id="zad-force-draw-${i}" data-probkey="${esc(probKey)}"></div>
+           </div>`
+        : "";
+
       let body = "";
 
       if (p.kind === "num") {
         if (solved || fb.correct) {
           const line = fb.praise || praiseLine("first");
           const calib = fb.conf ? calibrationNote(fb.conf, true) : "";
-          body = `<div class="tr-fb ok">✔ ${esc(line)}</div>${calib ? `<div class="zad-calib">🎯 ${esc(calib)}</div>` : ""}<div class="prob-block">${esc(p.s || "")}</div>`;
+          body = `<div class="tr-fb ok">✔ ${esc(line)}</div>${calib ? `<div class="zad-calib">🎯 ${esc(calib)}</div>` : ""}${renderZadForceReview(p, probKey, fb, "zad-force-rate")}<div class="prob-block">${esc(p.s || "")}</div>`;
         } else {
           const wrongMsg = fb.checked
-            ? `<div class="tr-fb bad">✗ Пока не то</div>${fb.conf ? `<div class="zad-calib">🎯 ${esc(calibrationNote(fb.conf, false))}</div>` : ""}<div class="compass-hint">🧭 ${esc(p.hint || "")}</div>`
+            ? `<div class="tr-fb bad">✗ Пока не то</div>${fb.conf ? `<div class="zad-calib">🎯 ${esc(calibrationNote(fb.conf, false))}</div>` : ""}<div class="compass-hint">🧭 ${esc(p.hint || "Перечитай условие ещё раз — какая формула или закон здесь подходит?")}</div>`
             : "";
-          body = `${wrongMsg}
+          body = `${forceDrawBlock}${wrongMsg}
             <div class="answer-row">
               <input id="zad-inp-${i}" class="th-drill-input" inputmode="decimal" autocomplete="off" placeholder="Ответ">
               ${p.unit ? `<span class="unit">${esc(p.unit)}</span>` : ""}
@@ -19500,12 +20689,12 @@ if (typeof window !== "undefined" && window.REALM_ART) {
           }).join("");
           const line = fb.praise || praiseLine("first");
           body = `<div class="th-mistake-opts">${opts}</div>
-            ${ok ? `<div class="tr-fb ok">✔ ${esc(line)}</div><div class="prob-block">${esc(p.s || "")}</div>`
-                 : `<div class="tr-fb bad">✗ Пока не то</div><div class="compass-hint">🧭 ${esc(p.hint || "")}</div>`}`;
+            ${ok ? `<div class="tr-fb ok">✔ ${esc(line)}</div>${renderZadForceReview(p, probKey, fb, "zad-force-rate")}<div class="prob-block">${esc(p.s || "")}</div>`
+                 : `<div class="tr-fb bad">✗ Пока не то</div><div class="compass-hint">🧭 ${esc(p.hint || "Перечитай условие ещё раз — какая формула или закон здесь подходит?")}</div>`}`;
         } else {
           const opts = p.options.map((o, oi) =>
             `<button class="exam-opt" data-act="zad-mc" data-key="${probKey}" data-i="${i}" data-idx="${oi}">${esc(o)}</button>`).join("");
-          body = `<div class="th-mistake-opts">${opts}</div>`;
+          body = `${forceDrawBlock}<div class="th-mistake-opts">${opts}</div>`;
         }
       } else { // open
         if (solved || fb.revealed) {
@@ -19528,9 +20717,12 @@ if (typeof window !== "undefined" && window.REALM_ART) {
                 </div>
               </div>`;
           }
-          body = `<div class="tr-fb ok">✔ ${esc(line)}</div><div class="prob-block"><b>Ответ:</b> ${esc(p.a || "")}</div>${selfBlock}`;
+          // Для open-задач уже есть свой ряд самооценки (понял/было близко/не совсем) —
+          // отдельный ряд под рисунок сюда не добавляем, чтобы не дублировать один и тот
+          // же вопрос двумя разными рядами кнопок подряд.
+          body = `<div class="tr-fb ok">✔ ${esc(line)}</div>${renderZadForceReview(p, probKey, null, null)}<div class="prob-block"><b>Ответ:</b> ${esc(p.a || "")}</div>${selfBlock}`;
         } else {
-          body = `<details class="prob-sol"><summary>🧭 Показать подсказку</summary><div class="compass-hint">${esc(p.hint || "")}</div></details>
+          body = `${forceDrawBlock}<details class="prob-sol"><summary>🧭 Показать подсказку</summary><div class="compass-hint">${esc(p.hint || "Перечитай условие ещё раз — какая формула или закон здесь подходит?")}</div></details>
             <button class="btn btn-ghost btn-sm" data-act="zad-reveal" data-key="${probKey}" data-i="${i}">✅ Я подумал — сверить с ответом</button>`;
         }
       }
@@ -19547,6 +20739,51 @@ if (typeof window !== "undefined" && window.REALM_ART) {
       <h2 class="mq-h">${m ? esc(m.tp.t) : "Задачи"}</h2>
       <div class="gh-sub">Числовые задачи проверяются сразу. В открытых — сначала подумай сам, потом сверься с ответом.</div>
       <div class="gh-sec">${probs}</div>`;
+  }
+
+  // «Дано» + сравнение рисунка ученика с эталоном — показывается после проверки
+  // ответа в задачах Задачника, где была фигура forceScene. Рисунок ученика
+  // берётся из сохранённого черновика (тот же storageKey, что и на шаге рисования),
+  // поэтому здесь ничего заново рисовать не нужно — оба SVG статичные (readOnly).
+  // rateKey — под каким именем хранить самооценку в fb-объекте вызывающей стороны
+  // (просто "selfRate"); fb и onRate передаются вызывающей стороной, чтобы функция
+  // не была жёстко привязана к ui.zadFb — тем же кодом пользуется и Задачник, и
+  // Комплексные задачи, у каждого свой стор состояния.
+  function renderZadForceReview(p, probKey, fb, onRateAct) {
+    if (!p.forceScene) return "";
+    const safeId = esc(probKey).replace(/[^a-zA-Z0-9]/g, "_");
+    const rate = fb && fb.selfRate;
+    const RATE_ACK = {
+      match: "Отлично — ты верно почувствовал(а) направления сил.",
+      close: "Неплохо — сверься с эталоном ещё раз, где именно разошлось.",
+      off: "Ничего, самое важное уже сделано — ты сравнил(а) со схемой сам(а).",
+    };
+    const rateRow = onRateAct
+      ? (rate
+          ? `<div class="zad-calib">🪞 ${esc(RATE_ACK[rate] || "")}</div>`
+          : `<div class="zad-conf">
+              <div class="zad-conf-label">Насколько твой рисунок похож на эталон?</div>
+              <div class="zad-conf-row">
+                <button class="btn btn-ghost btn-sm" data-act="${onRateAct}" data-key="${esc(probKey)}" data-rate="match">✅ Точно так же</button>
+                <button class="btn btn-ghost btn-sm" data-act="${onRateAct}" data-key="${esc(probKey)}" data-rate="close">👍 Похоже</button>
+                <button class="btn btn-ghost btn-sm" data-act="${onRateAct}" data-key="${esc(probKey)}" data-rate="off">🤔 Не очень</button>
+              </div>
+            </div>`)
+      : "";
+    return `<div class="zad-force-review">
+        ${p.forceScene.given ? `<div class="zad-force-given"><b>Дано:</b> ${esc(p.forceScene.given)}</div>` : ""}
+        <div class="force-canvas-row">
+          <div class="force-canvas-col">
+            <div class="force-canvas-label">Твой рисунок</div>
+            <div class="force-canvas-wrap" id="zad-force-mine-${safeId}"></div>
+          </div>
+          <div class="force-canvas-col">
+            <div class="force-canvas-label good">✓ Эталон</div>
+            <div class="force-canvas-wrap" id="zad-force-ref-${safeId}"></div>
+          </div>
+        </div>
+        ${rateRow}
+      </div>`;
   }
 
   // ====== Экзамен: случайные задачи из тем, очки и время ======
@@ -19589,10 +20826,17 @@ if (typeof window !== "undefined" && window.REALM_ART) {
     if (examTimer) { clearInterval(examTimer); examTimer = null; }
     e.dt = Date.now() - e.t0;
     e.xp = e.points * 3;
-    if (!State.data.exam) State.data.exam = { best: 0, taken: 0 };
+    if (!State.data.exam) State.data.exam = { best: 0, bestPct: 0, taken: 0 };
     State.data.exam.taken = (State.data.exam.taken || 0) + 1;
-    e.best = e.points > (State.data.exam.best || 0);
-    if (e.best) State.data.exam.best = e.points;
+    // Сравнивать рекорд по сырым очкам некорректно: длинный экзамен (15
+    // вопросов) физически набирает больше очков, чем короткий (5), даже при
+    // идеальном прохождении обоих — значит короткий экзамен никогда не мог
+    // бы побить рекорд длинного. Сравниваем по доле от максимума ЭТОЙ
+    // конкретной попытки (maxPoints зависит от того, какие вопросы попались
+    // по сложности, и известен только постфактум).
+    const pct = e.maxPoints > 0 ? e.points / e.maxPoints : 0;
+    e.best = pct > (State.data.exam.bestPct || 0);
+    if (e.best) { State.data.exam.bestPct = pct; State.data.exam.best = e.points; }
     if (e.xp) State.addXP(e.xp, "exam");
     State.save();
     e.phase = "done";
@@ -19603,7 +20847,7 @@ if (typeof window !== "undefined" && window.REALM_ART) {
   function viewExam() {
     const e = ui.exam;
     if (!e || e.phase === "intro") {
-      const best = (State.data.exam && State.data.exam.best) || 0;
+      const bestPct = State.data.exam && State.data.exam.bestPct ? Math.round(State.data.exam.bestPct * 100) : 0;
       const SEC_META = { intro: "🔭", matter: "🧪", mechanics: "🏃", pressure: "🌊", work: "⚙️", thermal: "🔥", dynamics: "🚀", electricity: "⚡", magnetism: "🧲", optics: "🔬" };
       const theory = (GAME.examTheory && GAME.examTheory["grade" + ui.gradeSel]) || [];
       const secs = theory.map((q) => q.sec).filter((x, i, a) => a.indexOf(x) === i);
@@ -19613,7 +20857,7 @@ if (typeof window !== "undefined" && window.REALM_ART) {
         ${fxDots(12)}
         <div class="mq-mission-top"><button class="btn btn-ghost" data-act="open-grade" data-grade="${ui.gradeSel}">← Меню</button><span class="mq-badge">📝 Экзамен</span></div>
         <h2 class="mq-h">Экзамен</h2>
-        <div class="gh-sub">Выбери раздел. В каждом — теория (выбор ответа), обычные и сложные задачи.${best ? ` Рекорд: <b>${best}</b> ⭐.` : ""}</div>
+        <div class="gh-sub">Выбери раздел. В каждом — теория (выбор ответа), обычные и сложные задачи.${bestPct ? ` Рекорд: <b>${bestPct}%</b> правильных.` : ""}</div>
         <div class="menu-grid">${cards}</div>`;
     }
     if (e.phase === "len") {
@@ -19724,6 +20968,8 @@ if (typeof window !== "undefined" && window.REALM_ART) {
   // Тренажёр темы: задачи разных видов, растущие по сложности (3 уровня)
   /* ================= «Расставь силы» — практика диаграмм сил (canvas, drag) ================= */
   let activeForceInst = null; // текущий интерактивный canvas-инстанс практики (живёт между чипами, не пересоздаётся на каждый тап)
+  let activeForceFreeInst = null; // текущий инстанс свободного SVG-редактора сил (режим «Нарисуй сам»)
+  let activeGraphInst = null; // текущий интерактивный canvas-инстанс конструктора графиков
 
   function viewForcesList() {
     const g = ui.gradeSel;
@@ -19783,6 +21029,37 @@ if (typeof window !== "undefined" && window.REALM_ART) {
     const sc = (GAME.forceScenarios || []).find((s) => s.id === st.scenarioId);
     if (!sc) return viewForcesList();
 
+    // Переключатель режима: "pool" — исходная практика (выбор из пула + drag
+    // наконечника), "free" — новый свободный SVG-редактор («как на ЕГЭ»,
+    // рисуешь сам на чистом поле). Оба режима работают с одним и тем же
+    // сценарием sc, поэтому условие/объяснение общие.
+    const mode = st.mode || "pool";
+    const modeTabs = `<div class="force-mode-tabs">
+        <button class="force-mode-tab${mode === "pool" ? " on" : ""}" data-act="forces-mode" data-mode="pool">🖐 Выбери и перетащи</button>
+        <button class="force-mode-tab${mode === "free" ? " on" : ""}" data-act="forces-mode" data-mode="free">✏️ Нарисуй сам (как на ЕГЭ)</button>
+      </div>`;
+
+    if (mode === "free") {
+      return `
+        ${fxDots(10)}
+        <div class="mq-mission-top"><button class="btn btn-ghost" data-act="forces-back">← К списку</button><span class="mq-badge">⚖️ Расставь силы</span></div>
+        <h2 class="mq-h">${esc(sc.title)}</h2>
+        <div class="tr-card">
+          <div class="tr-q">${esc(sc.desc)}</div>
+          ${modeTabs}
+          <div class="gh-sub">Нарисуй тело, опоры и векторы сил сам — выбирай инструмент внизу палитры и проводи по полю от точки приложения силы до её конца. Здесь нет автопроверки: когда закончишь, сверься с эталонной диаграммой ниже (кнопка «Показать верную схему»).</div>
+          <div class="force-free-wrap" id="force-free-mount"></div>
+          <div class="force-actions">
+            <button class="btn btn-gold" data-act="forces-free-reveal">${st.freeRevealed ? "Скрыть верную схему" : "Показать верную схему"}</button>
+          </div>
+          ${st.freeRevealed ? `<div class="force-canvas-col" style="margin-top:10px;max-width:320px">
+              <div class="force-canvas-label good">✓ Верная диаграмма</div>
+              <div class="force-canvas-wrap" id="force-mount-ref-free"></div>
+            </div>
+            <div class="tr-sol"><b>Объяснение.</b> ${esc(sc.explain)}</div>` : ""}
+        </div>`;
+    }
+
     const chips = sc.pool.map((id) => {
       const meta = GAME.forceMeta[id];
       return `<button class="${forceChipClass(id, sc, st)}" data-act="forces-toggle" data-id="${id}" style="--chip-color:${meta.color}" ${st.checked ? "disabled" : ""}>${esc(meta.label)}</button>`;
@@ -19810,6 +21087,7 @@ if (typeof window !== "undefined" && window.REALM_ART) {
       <h2 class="mq-h">${esc(sc.title)}</h2>
       <div class="tr-card">
         <div class="tr-q">${esc(sc.desc)}</div>
+        ${modeTabs}
         <div class="force-canvas-row">
           <div class="force-canvas-col">
             <div class="force-canvas-label">${st.checked ? "Твоя диаграмма" : "🖐 Перетащи наконечники стрелок"}</div>
@@ -19827,6 +21105,59 @@ if (typeof window !== "undefined" && window.REALM_ART) {
         ${st.checked ? `<div class="tr-actions"><button class="btn btn-primary" data-act="forces-next">Следующий сценарий →</button><button class="btn btn-ghost" data-act="forces-retry">↺ Ещё раз</button></div>` : ""}
       </div>`;
   }
+
+  /* ====== 📈 Построй график: список сценариев + сам экран построения ======
+     Тот же принцип сравнения, что уже проверен в graphBuilder внутри теории:
+     ученик ставит точки на пустой сетке, эталон сверяется сэмплированием
+     обеих ломаных в одних и тех же точках X с допуском по Y. */
+  function viewGraphsList() {
+    const g = ui.gradeSel;
+    const scenarios = (GAME.graphScenarios || []).filter((s) => s.grade === g);
+    const cards = scenarios.map((s) => {
+      const done = State.data.graphsDone && State.data.graphsDone[s.id];
+      return `<button class="menu-card mc-forces" data-act="graphs-pick" data-id="${s.id}">
+          <span class="mc-ico">📈</span>
+          <span class="mc-text"><span class="mc-name">${esc(s.title)}</span><span class="mc-desc">${done ? "Пройдено ✓" : (s.kind === "v" ? "График скорости" : "График пути")}</span></span>
+          <span class="mc-go">▶</span>
+        </button>`;
+    }).join("");
+    return `
+      ${fxDots(12)}
+      <div class="mq-mission-top"><button class="btn btn-ghost" data-act="open-grade" data-grade="${g}">← Меню</button><span class="mq-badge">📈 Графики</span></div>
+      <h2 class="mq-h">Построй график</h2>
+      <div class="gh-sub">Пустая сетка без готового чертежа — коснись где угодно, чтобы поставить точку, перетащи, чтобы поправить. Потом сверься с эталонной линией.</div>
+      ${scenarios.length ? `<div class="menu-grid">${cards}</div>` : `<div class="prog-note">Для ${g} класса сценарии пока не добавлены.</div>`}`;
+  }
+
+  function viewGraphs() {
+    const st = ui.graphLab;
+    if (!st) return viewGraphsList();
+    const sc = (GAME.graphScenarios || []).find((s) => s.id === st.scenarioId);
+    if (!sc) return viewGraphsList();
+
+    let feedback = "";
+    if (st.checked) {
+      const r = st.result || { pct: 0, good: false };
+      const pLine = r.good ? (st.usedRetry ? praiseLine("retry") : praiseLine("first")) : "";
+      feedback = r.good
+        ? `<div class="tr-fb ok">✅ ${esc(pLine)} Совпадение ${r.pct}%.</div><div class="tr-sol"><b>Объяснение.</b> ${esc(sc.explain)}</div>`
+        : `<div class="tr-fb bad">❌ Совпадение с верным графиком — ${r.pct}%. Зелёная пунктирная линия — эталон, сравни со своей.</div><div class="tr-sol"><b>Объяснение.</b> ${esc(sc.explain)}</div>`;
+    }
+
+    return `
+      ${fxDots(10)}
+      <div class="mq-mission-top"><button class="btn btn-ghost" data-act="graphs-back">← К списку</button><span class="mq-badge">📈 Построй график</span></div>
+      <h2 class="mq-h">${esc(sc.title)}</h2>
+      <div class="tr-card">
+        <div class="tr-q">${esc(sc.desc)}</div>
+        <div class="force-hint-sub">${st.checked ? (st.result && st.result.good ? "Твоя линия (синим) и эталон (зелёным пунктиром)." : "Сравни свою линию (синим) с эталоном (зелёным пунктиром).") : "Коснись сетки, чтобы поставить точку. Уже поставленную — перетащи, чтобы подвинуть."}</div>
+        <div class="force-canvas-wrap" id="graph-mount-user"></div>
+        ${!st.checked ? `<div class="force-actions"><button class="btn btn-ghost" data-act="graphs-undo">Отменить точку</button><button class="btn btn-ghost" data-act="graphs-reset">Сбросить</button><button class="btn btn-gold" data-act="graphs-check">Готово — сравнить</button></div>` : ""}
+        ${feedback}
+        ${st.checked ? `<div class="tr-actions"><button class="btn btn-primary" data-act="graphs-next">Следующий сценарий →</button><button class="btn btn-ghost" data-act="graphs-retry">↺ Ещё раз</button></div>` : ""}
+      </div>`;
+  }
+
 
   /* монтирует живой(ые) canvas после того, как HTML уже вставлен в DOM — вызывается из render() */
   /* ============================================================
@@ -19959,10 +21290,44 @@ if (typeof window !== "undefined" && window.REALM_ART) {
   }
 
   function mountForcesIfNeeded() {
-    if (ui.view !== "forces" || !ui.forces) return;
+    if (ui.view !== "forces" || !ui.forces) {
+      // Уход с экрана «Расставь силы» на любой другой раздел (а не только
+      // через кнопку «Назад») раньше не снимал слушатели mouseup/touchend —
+      // они намеренно висят на window (чтобы отпускание пальца/мыши ЗА
+      // пределами canvas тоже корректно завершало drag), но canvas при этом
+      // уже удалён из DOM через перезапись root.innerHTML. Слушатель продолжал
+      // жить, ссылаясь на отсоединённый узел, до следующего захода в этот
+      // раздел — в длинной сессии с частыми переключениями экранов это
+      // ощутимая утечка. Чистим здесь же, при любом уходе.
+      if (activeForceInst) { try { activeForceInst.destroy(); } catch (e) {} activeForceInst = null; }
+      if (activeForceFreeInst) { try { activeForceFreeInst.destroy(); } catch (e) {} activeForceFreeInst = null; }
+      return;
+    }
     const st = ui.forces;
     const sc = (GAME.forceScenarios || []).find((s) => s.id === st.scenarioId);
     if (!sc) return;
+    const mode = st.mode || "pool";
+
+    if (mode === "free") {
+      // свободный режим: canvas-drag практики не показывается, поэтому её
+      // инстанс (если остался от переключения вкладки) размонтируем.
+      if (activeForceInst) { try { activeForceInst.destroy(); } catch (e) {} activeForceInst = null; }
+      const elFree = document.getElementById("force-free-mount");
+      if (elFree) {
+        if (activeForceFreeInst) { try { activeForceFreeInst.destroy(); } catch (e) {} }
+        activeForceFreeInst = ForceFreeDraw.mount(elFree, { storageKey: sc.id });
+      }
+      if (st.freeRevealed) {
+        const elRF = document.getElementById("force-mount-ref-free");
+        if (elRF) { const ref = Forces.mount(elRF, sc, { readOnly: true }); ref.setAllCorrect(); ref.render(); }
+      }
+      return;
+    }
+
+    // pool-режим (исходная практика) — переключение вкладки могло оставить
+    // висеть инстанс свободного редактора, его тоже нужно снять.
+    if (activeForceFreeInst) { try { activeForceFreeInst.destroy(); } catch (e) {} activeForceFreeInst = null; }
+
     if (!st.checked) {
       const el = document.getElementById("force-mount-user");
       if (!el) return;
@@ -19984,9 +21349,160 @@ if (typeof window !== "undefined" && window.REALM_ART) {
     }
   }
 
+  function mountGraphsIfNeeded() {
+    if (ui.view !== "graphs" || !ui.graphLab) {
+      // Тот же класс утечки, что и в mountForcesIfNeeded: GraphLab.mount тоже
+      // вешает mouseup/touchend на window (чтобы отпускание за пределами
+      // canvas корректно завершало перетаскивание точки), и раньше уход с
+      // экрана «Построй график» на любой другой раздел не снимал их.
+      if (activeGraphInst) { try { activeGraphInst.destroy(); } catch (e) {} activeGraphInst = null; }
+      return;
+    }
+    const st = ui.graphLab;
+    const sc = (GAME.graphScenarios || []).find((s) => s.id === st.scenarioId);
+    if (!sc) return;
+    const el = document.getElementById("graph-mount-user");
+    if (!el) return;
+    if (activeGraphInst) { try { activeGraphInst.destroy(); } catch (e) {} activeGraphInst = null; }
+    if (!st.checked) {
+      activeGraphInst = GraphLab.mount(el, sc, { interactive: true, studentPoints: st.snapshot || [] });
+    } else {
+      GraphLab.mount(el, sc, { interactive: false, studentPoints: st.snapshot || [], showCorrect: true });
+    }
+  }
+
+  // Задачник: рисунок сил показан СРАЗУ вместе с полем ответа (num/mc/open —
+  // любой тип), одной кнопкой «Проверить» проверяются и рисунок, и ответ.
+  // После проверки — статичное сравнение рисунка ученика с эталоном.
+  // Несколько задач с этим шагом могут быть видны на экране одновременно
+  // (в отличие от «Расставь силы», где практика — это один экран на раз),
+  // поэтому инстансы редакторов держим в массиве, а не в одной переменной.
+  let activeZadForceInsts = [];
+  function mountZadForceIfNeeded() {
+    activeZadForceInsts.forEach((inst) => { try { inst.destroy(); } catch (e) {} });
+    activeZadForceInsts = [];
+    if (ui.view !== "zadachnik-topic") return;
+    const key = ui.zadKey;
+    const zad = (GAME.zadachnik && GAME.zadachnik["grade" + ui.gradeSel] && GAME.zadachnik["grade" + ui.gradeSel][key]) || null;
+    if (!zad) return;
+
+    zad.problems.forEach((p, i) => {
+      if (!p.forceScene) return;
+      const probKey = key + ":" + i;
+      const safeId = probKey.replace(/[^a-zA-Z0-9]/g, "_");
+
+      // активный редактор рисования (шаг перед ответом)
+      const elDraw = document.getElementById("zad-force-draw-" + i);
+      if (elDraw) {
+        const inst = ForceFreeDraw.mount(elDraw, { storageKey: "zad:" + probKey });
+        activeZadForceInsts.push(inst);
+        return;
+      }
+
+      // после ответа: рисунок ученика (readOnly, из черновика) + эталон рядом
+      const elMine = document.getElementById("zad-force-mine-" + safeId);
+      const elRef = document.getElementById("zad-force-ref-" + safeId);
+      if (elMine || elRef) {
+        let mineItems = [];
+        try {
+          const raw = State.data.forceFreeDrafts && State.data.forceFreeDrafts["zad:" + probKey];
+          if (raw) mineItems = JSON.parse(raw);
+        } catch (e) { mineItems = []; }
+        if (elMine) {
+          const instMine = ForceFreeDraw.mount(elMine, { readOnly: true, initialItems: mineItems });
+          activeZadForceInsts.push(instMine);
+        }
+        if (elRef) {
+          const instRef = ForceFreeDraw.mount(elRef, { readOnly: true, initialItems: p.forceScene.refItems });
+          activeZadForceInsts.push(instRef);
+        }
+      }
+    });
+  }
+
+  // Комплексные задачи: рисунок сил показан сразу над задачей, а «Дано/Решение/
+  // Ответ» доступно тут же в <details> — оба элемента в DOM одновременно
+  // (в отличие от прежней версии, где один сменял другой после «Готово»),
+  // поэтому монтируем и активный редактор, и блок сравнения вместе.
+  let activeProbForceInsts = [];
+  let suppressDetailsToggle = false; // подавляет реакцию на toggle во время программного restore-open в render()
+  function mountProbForceIfNeeded() {
+    activeProbForceInsts.forEach((inst) => { try { inst.destroy(); } catch (e) {} });
+    activeProbForceInsts = [];
+    if (ui.view !== "problems") return;
+    const sets = (GAME.problems && GAME.problems["grade" + ui.gradeSel]) || [];
+
+    sets.forEach((set) => {
+      set.problems.forEach((p, i) => {
+        if (!p.forceScene) return;
+        const probKey = set.id + ":" + i;
+        const safeId = probKey.replace(/[^a-zA-Z0-9]/g, "_");
+
+        // активный редактор рисования (всегда виден над задачей)
+        const elDraw = document.getElementById("prob-force-draw-" + safeId);
+        if (elDraw) {
+          const inst = ForceFreeDraw.mount(elDraw, { storageKey: "prob:" + probKey });
+          activeProbForceInsts.push(inst);
+        }
+
+        // рисунок ученика (readOnly, из того же черновика) + эталон внутри <details>
+        const reviewKey = "prob:" + probKey;
+        const reviewSafeId = reviewKey.replace(/[^a-zA-Z0-9]/g, "_");
+        const elMine = document.getElementById("zad-force-mine-" + reviewSafeId);
+        const elRef = document.getElementById("zad-force-ref-" + reviewSafeId);
+        if (elMine || elRef) {
+          let mineItems = [];
+          try {
+            const raw = State.data.forceFreeDrafts && State.data.forceFreeDrafts["prob:" + probKey];
+            if (raw) mineItems = JSON.parse(raw);
+          } catch (e) { mineItems = []; }
+          if (elMine) {
+            const instMine = ForceFreeDraw.mount(elMine, { readOnly: true, initialItems: mineItems });
+            activeProbForceInsts.push(instMine);
+          }
+          if (elRef) {
+            const instRef = ForceFreeDraw.mount(elRef, { readOnly: true, initialItems: p.forceScene.refItems });
+            activeProbForceInsts.push(instRef);
+          }
+        }
+
+        // "Твой рисунок" внутри <details> должен показывать АКТУАЛЬНОЕ состояние
+        // на момент открытия (черновик мог обновиться, пока <details> был закрыт).
+        // Раньше это решалось полным render() по событию toggle — но это заставляло
+        // mountProbForceIfNeeded() перемонтировать ВСЕ активные редакторы рисования
+        // на странице (не только для этой задачи), что при большом числе уже открытых
+        // <details> ощутимо росло по стоимости с каждым открытием. Вместо полного
+        // render() точечно перемонтируем только elMine для этого конкретного <details>.
+        const detailsEl = elMine ? elMine.closest("details.prob-sol") : (elDraw ? elDraw.closest(".prob")?.querySelector("details.prob-sol") : null);
+        if (detailsEl && elMine) {
+          detailsEl.addEventListener("toggle", () => {
+            if (suppressDetailsToggle) return; // программное восстановление open — не настоящее взаимодействие
+            if (!detailsEl.open) return;
+            let freshItems = [];
+            try {
+              const raw = State.data.forceFreeDrafts && State.data.forceFreeDrafts["prob:" + probKey];
+              if (raw) freshItems = JSON.parse(raw);
+            } catch (e) { freshItems = []; }
+            ForceFreeDraw.mount(elMine, { readOnly: true, initialItems: freshItems });
+          });
+        }
+      });
+    });
+  }
+
   function forcesPick(id) {
-    ui.forces = { scenarioId: id, checked: false, result: null, snapshot: null, fu: null };
+    ui.forces = { scenarioId: id, checked: false, result: null, snapshot: null, fu: null, mode: "pool", freeRevealed: false };
     ui.view = "forces"; render(); window.scrollTo(0, 0);
+  }
+  function forcesSetMode(mode) {
+    const st = ui.forces; if (!st || st.mode === mode) return;
+    st.mode = mode;
+    render();
+  }
+  function forcesFreeReveal() {
+    const st = ui.forces; if (!st) return;
+    st.freeRevealed = !st.freeRevealed;
+    render();
   }
   function forcesToggleChip(node, id) {
     const st = ui.forces; if (!st || st.checked || !activeForceInst) return;
@@ -20024,7 +21540,7 @@ if (typeof window !== "undefined" && window.REALM_ART) {
   }
   function forcesRetry() {
     const st = ui.forces; if (!st) return;
-    ui.forces = { scenarioId: st.scenarioId, checked: false, result: null, snapshot: null, fu: null };
+    ui.forces = { scenarioId: st.scenarioId, checked: false, result: null, snapshot: null, fu: null, mode: st.mode || "pool", freeRevealed: false };
     render();
   }
   function forcesNext() {
@@ -20034,10 +21550,15 @@ if (typeof window !== "undefined" && window.REALM_ART) {
     const idx = scenarios.findIndex((s) => s.id === st.scenarioId);
     const next = scenarios[idx + 1];
     if (next) forcesPick(next.id);
-    else { if (activeForceInst) { try { activeForceInst.destroy(); } catch (e) {} activeForceInst = null; } ui.forces = null; render(); window.scrollTo(0, 0); }
+    else {
+      if (activeForceInst) { try { activeForceInst.destroy(); } catch (e) {} activeForceInst = null; }
+      if (activeForceFreeInst) { try { activeForceFreeInst.destroy(); } catch (e) {} activeForceFreeInst = null; }
+      ui.forces = null; render(); window.scrollTo(0, 0);
+    }
   }
   function forcesBack() {
     if (activeForceInst) { try { activeForceInst.destroy(); } catch (e) {} activeForceInst = null; }
+    if (activeForceFreeInst) { try { activeForceFreeInst.destroy(); } catch (e) {} activeForceFreeInst = null; }
     ui.forces = null; render(); window.scrollTo(0, 0);
   }
 
@@ -20145,6 +21666,115 @@ if (typeof window !== "undefined" && window.REALM_ART) {
         </div>
         <div class="save-warn">⚠️ Импорт заменит текущий прогресс.</div>
       </div>`;
+  }
+
+  /* ---------- 🌌 Созвездия прогресса ---------- */
+  function constellStarPositions(n, cx, cy, rMin, rMax) {
+    const pts = [];
+    const golden = (137.508 * Math.PI) / 180;
+    for (let i = 0; i < n; i++) {
+      const angle = i * golden;
+      const frac = n > 1 ? i / (n - 1) : 0;
+      const r = rMin + (rMax - rMin) * Math.sqrt(frac);
+      pts.push({ x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r });
+    }
+    return pts;
+  }
+  const CONSTELL_MILESTONES = [
+    { frac: 0.25, xp: 10, coins: 5, label: "Четверть неба зажжена" },
+    { frac: 0.50, xp: 20, coins: 10, label: "Половина созвездия светится" },
+    { frac: 0.75, xp: 35, coins: 18, label: "Созвездие почти завершено" },
+    { frac: 1.00, xp: 60, coins: 30, label: "Созвездие зажжено полностью!" },
+  ];
+  function renderConstellCard(d, prevSeen) {
+    const frac = d.total ? d.done / d.total : 0;
+    const W = 300, H = 176, cx = W / 2, cy = H / 2 - 6;
+    const pts = constellStarPositions(d.total, cx, cy, 32, 78);
+    const starsSvg = pts.map((p, i) => {
+      if (i >= d.done) return `<circle cx="${p.x}" cy="${p.y}" r="2.5" class="constell-star dim"/>`;
+      const isNew = i >= prevSeen; // новая с прошлого визита — красиво зажигается
+      return `<text x="${p.x}" y="${p.y + 5}" text-anchor="middle" font-size="14" class="constell-star lit${isNew ? " ignite" : ""}" style="${isNew ? `animation-delay:${(i - prevSeen) * 0.15}s` : ""}">⭐</text>`;
+    }).join("");
+    const nextGoal = CONSTELL_MILESTONES.find((m) => frac < m.frac);
+    const milestoneNote = d.reward
+      ? `<div class="constell-bonus">🎁 ${esc(d.reward.label)} — +${d.reward.xp} XP, +${d.reward.coins} монет!</div>`
+      : (nextGoal ? `<div class="constell-next">До следующей награды: ${Math.max(0, Math.ceil(nextGoal.frac * d.total) - d.done)} ⭐</div>` : "");
+    return `<div class="constell-card">
+        <div class="constell-head"><span class="constell-ico">${d.icon}</span><span class="constell-name">${esc(d.name)}</span><span class="constell-count">${d.done}/${d.total} ⭐</span></div>
+        <svg viewBox="0 0 ${W} ${H}" class="constell-svg">
+          <defs><radialGradient id="gal-${d.key}" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="rgba(255,209,102,.85)"/>
+            <stop offset="55%" stop-color="rgba(139,92,246,.32)"/>
+            <stop offset="100%" stop-color="rgba(139,92,246,0)"/>
+          </radialGradient></defs>
+          <circle cx="${cx}" cy="${cy}" r="24" fill="url(#gal-${d.key})"/>
+          <text x="${cx}" y="${cy + 6}" text-anchor="middle" font-size="18">${d.icon}</text>
+          ${starsSvg}
+        </svg>
+        <div class="constell-bar"><div class="constell-bar-fill" style="width:${Math.round(frac * 100)}%"></div></div>
+        ${milestoneNote}
+      </div>`;
+  }
+  /* Пока только 7 класс — там есть реальное содержимое (can-блоки, Компас,
+     Задачник) по всем темам; 8-9 классы подключим, когда наполним их так же. */
+  function viewConstellations() {
+    const g = 7;
+    let courseTotal = 0;
+    const c7 = GAME.course && GAME.course["grade7"];
+    if (c7 && c7.sections) c7.sections.forEach((s) => { courseTotal += (s.topics || []).length; });
+    const courseDone = Math.min(State.missionsDoneCount(), courseTotal);
+
+    const zadTotal = (GAME.zadachnik && GAME.zadachnik.grade7) ? Object.keys(GAME.zadachnik.grade7).length : 0;
+    const zadBonus = (State.data.zad && State.data.zad.topicBonus) || {};
+    const zadDone = Math.min(Object.keys(zadBonus).filter((k) => zadBonus[k]).length, zadTotal);
+
+    const trainerKeys = Object.keys((typeof window !== "undefined" && window.TRAINER_MAP) || {});
+    const trainerCap = ((typeof window !== "undefined" && window.TRAINER_LEVELS) || []).length || 3;
+    const trainerTotal = trainerKeys.length;
+    const trainerDone = trainerKeys.filter((k) => State.trainerMaxLevel(k) >= trainerCap).length;
+
+    const storyTotal = (GAME.chapters || []).filter((c) => (c.grade || 7) === 7).length;
+    const advCompleted = (State.data.adventure && State.data.adventure.completed) || {};
+    const g7ChapterIds = (GAME.chapters || []).filter((c) => (c.grade || 7) === 7).map((c) => c.id);
+    const storyDone = Math.min(g7ChapterIds.filter((id) => advCompleted[id]).length, storyTotal);
+
+    const domains = [
+      { key: "course", icon: "📘", name: "Учебник", done: courseDone, total: courseTotal },
+      { key: "zadachnik", icon: "📚", name: "Задачник", done: zadDone, total: zadTotal },
+      { key: "trainer", icon: "🎯", name: "Тренажёр", done: trainerDone, total: trainerTotal },
+      { key: "story", icon: "⚔️", name: "Сюжет", done: storyDone, total: storyTotal },
+    ];
+
+    if (!State.data.constellations) State.data.constellations = {};
+    if (!State.data.constellations.seen) State.data.constellations.seen = {};
+    let toastQueue = [];
+    domains.forEach((d) => {
+      if (!d.total) return;
+      const frac = d.done / d.total;
+      const res = State.claimConstellationMilestones(d.key, frac, CONSTELL_MILESTONES);
+      if (res) { d.reward = res; toastQueue.push({ name: d.name, res }); }
+    });
+    if (toastQueue.length) {
+      setTimeout(() => {
+        toastQueue.forEach((t, i) => setTimeout(() => toast({ ico: "🌌", strong: `${t.name}: ${t.res.label}`, sub: `+${t.res.xp} XP · +${t.res.coins} монет`, cls: "gold", ttl: 3200 }), i * 650));
+        updateHUD();
+      }, 350);
+    }
+
+    const cards = domains.map((d) => {
+      const prevSeen = State.data.constellations.seen[d.key] || 0;
+      const html = renderConstellCard(d, prevSeen);
+      State.data.constellations.seen[d.key] = d.done; // отмечаем увиденным — при следующем визите не переигрывать анимацию
+      return html;
+    }).join("");
+    State.save();
+
+    return `
+      ${fxDots(10)}
+      <div class="mq-mission-top"><button class="btn btn-ghost" data-act="open-grade" data-grade="7">← Меню</button><span class="mq-badge">🌌 Созвездия</span></div>
+      <h2 class="mq-h">Созвездия прогресса</h2>
+      <div class="gh-sub">Каждая пройденная тема зажигает звезду в своём созвездии — учебник, задачник, тренажёр, сюжет. Пока только 7 класс. Дойдёшь до четверти, половины, трёх четвертей или всего неба целиком — получишь бонус в XP и монетах.</div>
+      <div class="constell-grid">${cards}</div>`;
   }
 
   function cabKnowledge() {
@@ -20280,76 +21910,108 @@ if (typeof window !== "undefined" && window.REALM_ART) {
      ============================================================ */
   const ONB = [
     {
-      ico: "🚀", title: "Что здесь можно делать",
-      text: "Это помощник по физике за 7 класс. Здесь ты разбираешь темы сам: читаешь понятные объяснения, решаешь задачи и возвращаешься к старым темам, чтобы не забыть их к контрольной. Сейчас проведу по приложению и покажу, где что лежит.",
+      ico: "🚀", title: "Привет!",
+      text: "Быстро покажу, что где лежит.",
       go: { view: "grade" },
     },
     {
-      ico: "📖", title: "Учебник — отсюда всё начинается",
-      text: "Вот эта кнопка. Внутри — все темы курса: объяснения без заумных слов, разобранные примеры и задачи. Сюда ты будешь заходить чаще всего.",
+      ico: "📖", title: "Учебник",
+      text: "Все темы курса: объяснения и задачи.",
       go: { view: "grade" }, sel: '[data-act="open-course"]',
     },
     {
       ico: "🗺️", title: "Карта тем",
-      text: "Так выглядит список тем. Проходишь их по очереди, но можно зайти в любую — ничего не заблокировано, если захочешь заглянуть вперёд.",
-      go: { view: "course" }, sel: ".mq-progress, .mq-hero",
+      text: "Проходи по порядку или выбирай сам.",
+      go: { view: "course" }, sel: ".mq-act",
     },
     {
-      ico: "🧭", title: "Внутри темы — 4 шага",
-      text: "Вот эта полоска наверху. Старт → Исследуем → Практика → Проверка. Это твой путь по теме. Нажми на любой шаг — сразу перепрыгнешь к нему.",
+      ico: "🧭", title: "4 шага темы",
+      text: "Старт → Исследуем → Практика → Проверка.",
       go: { view: "course-mission", mission: { sec: "mechanics", idx: 6 } }, sel: ".lesson-rail",
     },
     {
-      ico: "🔍", title: "Сначала угадай сам",
-      text: "В теме будет вопрос ещё ДО объяснения. Просто предположи наугад — тут можно ошибаться, это даже полезно: так лучше запомнится то, что идёт следом. Опыт дадут за саму попытку, даже если не угадал.",
-      go: { view: "course-mission", mission: { sec: "mechanics", idx: 6 } }, sel: ".th-explore",
+      ico: "🔍", title: "Угадай сам",
+      text: "Сначала вопрос, потом объяснение. Ошибаться можно.",
+      go: { view: "course-mission", mission: { sec: "mechanics", idx: 6 } }, sel: ".th-explore", cardAbove: true,
     },
     {
       ico: "❌", title: "Чужие ошибки",
-      text: "Красные карточки вроде этой. Показано неправильное решение — найди, где спрятался подвох. Это ошибки, на которых спотыкаются чаще всего: увидишь заранее — сам так не сделаешь.",
-      go: { view: "course-mission", mission: { sec: "mechanics", idx: 6 } }, sel: ".th-mistake",
+      text: "Найди подвох в неправильном решении.",
+      go: { view: "course-mission", mission: { sec: "mechanics", idx: 6 } }, sel: ".th-mistake", cardAbove: true,
     },
     {
       ico: "🌙", title: "Особое испытание",
-      text: "Фиолетовая карточка — задачка похитрее. Ситуация непохожая на примеры выше: проверяет, понял ты тему или просто запомнил образец. Не вышло — открой разбор, там всё по шагам.",
-      go: { view: "course-mission", mission: { sec: "mechanics", idx: 6 } }, sel: ".th-transfer",
+      text: "Задачка похитрее — проверяет понимание.",
+      go: { view: "course-mission", mission: { sec: "mechanics", idx: 6 } }, sel: ".th-transfer", cardAbove: true,
     },
     {
-      ico: "⚔️", title: "Задачи посильнее и попроще",
-      text: "У задач есть пометки: База, Средний, Повышенный. Тема новая — начинай с базы. Пошло легко — бери выше. Застрял — открой решение и посмотри, как надо.",
-      go: { view: "course-mission", mission: { sec: "mechanics", idx: 6 } }, sel: "#stage-tasks",
+      ico: "⚔️", title: "Задачи по силе",
+      text: "База, средний, повышенный — выбирай сам.",
+      go: { view: "course-mission", mission: { sec: "mechanics", idx: 6 } }, sel: "#stage-tasks", cardAbove: true,
     },
     {
-      ico: "🎯", title: "Сам ставишь себе планку",
-      text: "Перед проверкой сам решаешь, на какой результат идёшь. Замахнёшься выше — получишь больше за смелость. Не дотянешь — ничего не потеряешь, тема всё равно засчитается от 70%.",
+      ico: "🎯", title: "Своя планка",
+      text: "Ставишь цель перед проверкой сам.",
       go: { view: "course-mission", mission: { sec: "mechanics", idx: 6 } }, sel: ".goal-block",
     },
     {
-      ico: "🏆", title: "Финальная проверка",
-      text: "8 вопросов, нужно набрать хотя бы 70%. Пока не пройдёшь — тема не засчитается. Не получилось с первого раза — пробуй ещё, попытки не заканчиваются.",
+      ico: "🏆", title: "Проверка",
+      text: "70%+ — и тема засчитана.",
       go: { view: "course-mission", mission: { sec: "mechanics", idx: 6 } }, sel: "#stage-control",
     },
     {
       ico: "🔄", title: "Повторение",
-      text: "Через пару дней сданная тема сама всплывёт вот здесь. Короткий тест на пару минут. Чем дольше помнишь — тем реже появляется. Так к концу года ничего не забывается.",
+      text: "Через пару дней тема всплывёт сама.",
       go: { view: "grade" }, sel: '[data-act="open-review-hub"], [data-act="open-course"]',
     },
     {
-      ico: "🔥", title: "Огонёк — дни подряд",
-      text: "Счётчик наверху: сколько дней подряд ты занимаешься. Пропустишь день — сгорит, начнёшь заново. Чтобы удержать, хватит пары задач в день.",
+      ico: "🔥", title: "Огонёк",
+      text: "Дни подряд. Не пропускай — сгорит.",
       go: { view: "grade" }, sel: ".hud-chip.streak-active, .hud-chip.streak-risk, .hud-chip.streak-off",
     },
     {
-      ico: "🔬", title: "Лаборатория — всё про тебя",
-      text: "Твой герой, награды, шпаргалка с формулами и раздел «Мои ошибки» — все задачи, где ошибся, с разбором. Загляни туда перед контрольной.",
+      ico: "🔬", title: "Лаборатория",
+      text: "Герой, формулы и разбор ошибок.",
       go: { view: "cabinet" }, sel: ".subtabs, .screen-head",
     },
     {
-      ico: "✅", title: "Всё, можно начинать",
-      text: "Коротко: Учебник → тема по четырём шагам → проверка → через пару дней повторение. Захочешь пересмотреть экскурсию — она в Лаборатории.",
+      ico: "✅", title: "Начинаем!",
+      text: "Тур можно пересмотреть в Лаборатории.",
       go: { view: "grade" },
     },
   ];
+
+  // Экскурсия должна быть статичной: пока она идёт, фон приложения не должен
+  // прокручиваться сам по себе (это и ломалось на мобильных — тач-скролл
+  // двигал содержимое ПОД подсветкой, и она мгновенно расходилась с реальным
+  // положением элемента, потому что позиция вычисляется один раз при показе
+  // шага). Обычный `overflow: hidden` на body ненадёжен на мобильном Safari —
+  // он не всегда останавливает тач-скролл. Надёжный способ — зафиксировать
+  // body через position:fixed с сохранённым текущим scrollY, а после снять
+  // и восстановить позицию как было. scrollIntoView() внутри самой экскурсии
+  // при этом продолжает работать, так как это происходит ДО блокировки —
+  // сначала докручиваем к нужному элементу, потом фиксируем.
+  let onbScrollY = 0;
+  let onbResizeObserver = null; // следит за изменением размера/позиции текущего подсвеченного элемента
+  let onbSuppressResize = false; // поднят на время работы paintOnboarding()/lock-unlock вне неё — их собственный побочный эффект на layout (см. ниже) не должен запускать повторный пересчёт
+  function lockBodyScroll() {
+    if (document.body.classList.contains("onb-locked")) return;
+    const wasAlone = !onbSuppressResize; // не гасим флаг, если он уже держится снаружи (внутри paintOnboarding)
+    onbSuppressResize = true;
+    onbScrollY = window.scrollY || window.pageYOffset || 0;
+    document.body.style.top = -onbScrollY + "px";
+    document.body.classList.add("onb-locked");
+    if (wasAlone) setTimeout(() => { onbSuppressResize = false; }, 60);
+  }
+  function unlockBodyScroll() {
+    if (!document.body.classList.contains("onb-locked")) return;
+    const wasAlone = !onbSuppressResize;
+    onbSuppressResize = true;
+    document.body.classList.remove("onb-locked");
+    document.body.style.top = "";
+    window.scrollTo(0, onbScrollY);
+    if (wasAlone) setTimeout(() => { onbSuppressResize = false; }, 60);
+  }
 
   function showOnboarding(step) {
     step = step || 0;
@@ -20367,9 +22029,22 @@ if (typeof window !== "undefined" && window.REALM_ART) {
       if (viewChanged || missionChanged) {
         if (needMission) ui.mission = { sec: needMission.sec, idx: needMission.idx };
         ui.view = needView;
+        // Смена экрана заново создаёт весь DOM, а фиксация body через
+        // position:fixed зависит от текущей прокрутки — снимаем блокировку
+        // перед переключением экрана и накладываем заново после того, как
+        // paintOnboarding уже докрутил страницу к нужному элементу.
+        unlockBodyScroll();
         render();
-        // Даём кадр на отрисовку, затем рисуем подсветку поверх нового экрана
-        setTimeout(() => paintOnboarding(step), 60);
+        // Одного кадра (60мс) не всегда достаточно: если на экране есть
+        // картинки (например, иллюстрация темы), их подгрузка может
+        // сдвинуть раскладку уже ПОСЛЕ первого расчёта позиции — рамка
+        // подсветки в этом случае оказывается смещена относительно того,
+        // что видит пользователь. Пересчитываем ещё раз чуть позже, когда
+        // раскладка гарантированно устоялась — но только если пользователь
+        // за это время не успел перейти на другой шаг (иначе перерисуем
+        // уже неактуальный).
+        setTimeout(() => { if (ui.onbStep === step) paintOnboarding(step); }, 80);
+        setTimeout(() => { if (ui.onbStep === step) paintOnboarding(step); }, 320);
         return;
       }
     }
@@ -20377,6 +22052,21 @@ if (typeof window !== "undefined" && window.REALM_ART) {
   }
 
   function paintOnboarding(step) {
+    // Флаг поднят на ВСЁ время выполнения этой функции (не только внутри
+    // lockBodyScroll/unlockBodyScroll с их короткими internal setTimeout) —
+    // между их вызовами внутри этой же функции проходит scrollIntoView,
+    // поиск target и т.д., и узкое окно подавления могло закрыться раньше,
+    // чем реально нужно, оставляя щель для срабатывания ResizeObserver
+    // прямо посередине работы этой функции. См. комментарий у ResizeObserver
+    // ниже — это тот самый цикл, вешавший вкладку намертво на Windows.
+    onbSuppressResize = true;
+    try {
+      paintOnboardingInner(step);
+    } finally {
+      setTimeout(() => { onbSuppressResize = false; }, 60);
+    }
+  }
+  function paintOnboardingInner(step) {
     const s = ONB[step], last = step === ONB.length - 1;
     let el = document.getElementById("onboarding");
     if (!el) {
@@ -20407,8 +22097,17 @@ if (typeof window !== "undefined" && window.REALM_ART) {
       }
     }
 
-    // Если элемент за пределами видимой области — подкручиваем к нему
+    // Если элемент за пределами видимой области — подкручиваем к нему.
+    // ВАЖНО: пока страница зафиксирована через lockBodyScroll() (position:
+    // fixed на body), scrollIntoView физически не может её сдвинуть — нужно
+    // на время снять блокировку, прокрутить, и наложить заново уже с новой
+    // позиции. Без этого докрутка работает только при смене ЭКРАНА (там
+    // блокировка и так снимается в showOnboarding), но не между двумя
+    // соседними шагами тура НА ОДНОМ И ТОМ ЖЕ экране (например, разные блоки
+    // внутри одной темы урока) — подсвечиваемый элемент мог быть далеко за
+    // пределами текущей прокрутки, и тур застывал на пустом тёмном фоне.
     if (target) {
+      unlockBodyScroll();
       const r0 = target.getBoundingClientRect();
       if (r0.top < 60 || r0.bottom > window.innerHeight - 60) {
         try { target.scrollIntoView({ block: "center", behavior: "auto" }); } catch (_) {}
@@ -20418,23 +22117,45 @@ if (typeof window !== "undefined" && window.REALM_ART) {
     const r = target ? target.getBoundingClientRect() : null;
     const visible = r && r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < window.innerHeight;
 
-    let spotlight = "", cardPos = "";
+    let spotlight = "", cardPos = "", anchored = false;
     if (visible) {
       const pad = 8;
       const x = Math.max(4, r.left - pad), y = Math.max(4, r.top - pad);
       const w = Math.min(window.innerWidth - x - 4, r.width + pad * 2);
       const h = r.height + pad * 2;
       spotlight = `<div class="onb-spot" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px"></div>`;
-      const below = r.top < window.innerHeight * 0.5;
-      cardPos = below
-        ? `style="top:${Math.min(window.innerHeight - 250, r.bottom + 16)}px"`
-        : `style="bottom:${Math.min(window.innerHeight - 250, window.innerHeight - r.top + 16)}px"`;
+
+      // По умолчанию карточка предпочитает встать СНИЗУ от подсветки. Но для
+      // некоторых шагов (например, список примеров задач) низ подсветки —
+      // это как раз то место, где начинается контент, который нужно видеть:
+      // карточка снизу его закроет. s.cardAbove явно просит разместить
+      // карточку СВЕРХУ — и в отличие от обычной логики выбора стороны, тут
+      // нет отката на «снизу», если сверху тесно: если бы был откат, шаг с
+      // cardAbove мог бы всё равно оказаться внизу и снова закрыть контент,
+      // который специально просили не закрывать. Вместо отката — просто
+      // прижимаем к самому верху экрана (без привязки к точной границе
+      // блока), карточка компактная и туда почти всегда помещается.
+      const tryAboveFirst = !!s.cardAbove;
+      if (tryAboveFirst) {
+        anchored = true;
+        cardPos = `style="top:8px"`;
+      } else {
+        const MIN_CARD_SPACE = 120; // компактная привязанная карточка без иконки: заголовок+1 строка+кнопки+точки
+        const spaceBelow = window.innerHeight - y - h;
+        const spaceAbove = y;
+        if (spaceBelow >= MIN_CARD_SPACE) {
+          anchored = true;
+          cardPos = `style="top:${y + h + 16}px"`;
+        } else if (spaceAbove >= MIN_CARD_SPACE) {
+          anchored = true;
+          cardPos = `style="bottom:${window.innerHeight - y + 16}px"`;
+        }
+        // иначе anchored остаётся false — карточка уйдёт в обычный
+        // центрированный флекс-режим оверлея, без привязки к краю элемента
+      }
     }
 
-    el.className = "onb-overlay" + (visible ? " has-spot" : "");
-    el.innerHTML = `
-      ${spotlight}
-      <div class="onb-card ${visible ? "onb-card-anchored" : ""}" ${cardPos}>
+    const cardBody = `
         <div class="onb-ico">${s.ico}</div>
         <div class="onb-title">${esc(s.title)}</div>
         <div class="onb-text">${esc(s.text)}</div>
@@ -20444,10 +22165,106 @@ if (typeof window !== "undefined" && window.REALM_ART) {
           ${last ? "" : `<button class="btn btn-ghost btn-sm" data-onb="skip">Пропустить</button>`}
           <button class="btn btn-primary" data-onb="${last ? "done" : "next"}">${last ? "Начать!" : "Далее ▶"}</button>
         </div>
-        <div class="onb-counter">${step + 1} из ${ONB.length}</div>
-      </div>`;
+        <div class="onb-counter">${step + 1} из ${ONB.length}</div>`;
+
+    el.className = "onb-overlay" + (visible ? " has-spot" : "");
+    el.innerHTML = `
+      ${spotlight}
+      <div class="onb-card ${anchored ? "onb-card-anchored" : ""}" ${cardPos}>${cardBody}</div>`;
+
+    // MIN_CARD_SPACE выше — это ОЦЕНКА порога, а не гарантия: реальная высота
+    // карточки зависит от длины текста конкретного шага (у одних шагов текст
+    // короче, у других — четыре строки, как в «Карта тем»), и фиксированный
+    // порог не может учесть это заранее. Поэтому после вставки в DOM меряем
+    // РЕАЛЬНУЮ высоту получившейся карточки — если она всё равно вылезает
+    // за пределы экрана (её кнопки физически недоступны), перерисовываем этот
+    // же шаг уже без привязки к элементу, в безопасном центрированном режиме.
+    if (anchored) {
+      const cardEl = el.querySelector(".onb-card");
+      if (cardEl) {
+        const cr = cardEl.getBoundingClientRect();
+        const fitsScreen = cr.top >= 0 && cr.bottom <= window.innerHeight;
+        if (!fitsScreen) {
+          el.innerHTML = `${spotlight}<div class="onb-card">${cardBody}</div>`;
+        }
+      }
+    }
+
+    // Докрутка к элементу (если была нужна) уже случилась выше — теперь можно
+    // безопасно зафиксировать фон: дальше, пока показан этот шаг, страница
+    // статична, а подсветка не может разъехаться с реальным положением
+    // элемента, потому что фон физически не может сдвинуться.
+    lockBodyScroll();
+
+    // Подсвечиваемый элемент иногда меняет размер уже ПОСЛЕ того, как
+    // рамка нарисована (картинка темы догрузилась, шрифт подменился,
+    // содержимое реплики Ньютончика заняло другую высоту) — без слежения
+    // за этим рамка визуально «съезжает» и может захватывать соседний
+    // блок. ResizeObserver перерисовывает шаг при любом таком изменении.
+    if (onbResizeObserver) { try { onbResizeObserver.disconnect(); } catch (e) {} onbResizeObserver = null; }
+    if (target && typeof ResizeObserver !== "undefined") {
+      onbResizeObserver = new ResizeObserver(() => {
+        // Тот же класс цикла, что чинили для window "resize": paintOnboarding
+        // сама вызывает unlockBodyScroll()/lockBodyScroll() (см. выше), что на
+        // Windows-десктопе физически двигает layout (пропадает/появляется
+        // полоса прокрутки) — а значит двигается и сам target. ResizeObserver
+        // это видит, зовёт paintOnboarding снова, та снова дёргает lock/unlock,
+        // снова движение, снова колбэк — бесконечный цикл, вешающий вкладку
+        // намертво (главный поток никогда не доходит до обработки кликов).
+        // На мобильном скроллбар не занимает место в layout, поэтому там
+        // этот цикл никогда не проявлялся. onbSuppressResize — тот же флаг,
+        // что уже подавляет "resize" на window; используем его и здесь.
+        if (onbSuppressResize) return;
+        if (ui.onbStep === step) paintOnboarding(step);
+      });
+      try { onbResizeObserver.observe(target); } catch (e) {}
+    }
   }
-  function closeOnboarding() { const el = document.getElementById("onboarding"); if (el) el.remove(); State.data.settings.onboarded = true; State.save(); }
+  // На мобильном высота/ширина видимой области может измениться уже ПОСЛЕ
+  // того как шаг нарисован (поворот экрана, скрытие адресной строки при
+  // скролле, программная клавиатура) — без пересчёта подсветка и карточка
+  // остались бы привязаны к старым координатам. Перерисовываем текущий шаг
+  // (без повторной навигации — паспорт "go" срабатывает только на реальной
+  // смене экрана, а не на resize) при каждом изменении размеров.
+  //
+  // ВАЖНО (баг, который ловил зависание тура на Windows-десктопе, но не на
+  // телефоне): lockBodyScroll() навешивает position:fixed на body, что
+  // убирает вертикальную полосу прокрутки документа. На Windows эта полоса
+  // занимает реальное место в layout (в отличие от оверлейных скроллбаров
+  // на мобильных/macOS) — её исчезновение меняет window.innerWidth на её
+  // ширину (~15-17px), и браузер совершенно законно генерирует "resize".
+  // Наш обработчик на это событие перерисовывал шаг, что внутри снова
+  // дёргало unlock/lock скролла — потенциальный цикл resize→paint→resize.
+  // Чиним, запоминая последний РЕАЛЬНЫЙ размер и игнорируя события, где
+  // изменилась только ширина в пределах типичной полосы прокрутки (до 20px)
+  // при неизменной высоте — это не настоящий resize окна, а побочный эффект
+  // наших же lock/unlock, и реагировать на него не нужно.
+  let onbResizeTimer = null;
+  let onbLastW = window.innerWidth, onbLastH = window.innerHeight;
+  function onbHandleResize(delay) {
+    if (!document.getElementById("onboarding")) return;
+    if (onbSuppressResize) return; // это наш собственный lock/unlock меняет ширину — не настоящий resize
+    const w = window.innerWidth, h = window.innerHeight;
+    const dw = Math.abs(w - onbLastW), dh = Math.abs(h - onbLastH);
+    const looksLikeScrollbarNoise = dh === 0 && dw > 0 && dw <= 20;
+    onbLastW = w; onbLastH = h;
+    if (looksLikeScrollbarNoise) return; // не настоящий resize — не перерисовываем
+    clearTimeout(onbResizeTimer);
+    onbResizeTimer = setTimeout(() => {
+      if (onbSuppressResize) return;
+      onbLastW = window.innerWidth; onbLastH = window.innerHeight; // фиксируем размер ПОСЛЕ перерисовки, а не до
+      paintOnboarding(ui.onbStep || 0);
+    }, delay);
+  }
+  window.addEventListener("resize", () => onbHandleResize(120));
+  window.addEventListener("orientationchange", () => onbHandleResize(200));
+
+  function closeOnboarding() {
+    const el = document.getElementById("onboarding"); if (el) el.remove();
+    if (onbResizeObserver) { try { onbResizeObserver.disconnect(); } catch (e) {} onbResizeObserver = null; }
+    unlockBodyScroll();
+    State.data.settings.onboarded = true; State.save();
+  }
 
   function viewTeacher() {
     const students = (typeof window !== "undefined" && window.TEACHER_DEMO) || [];
@@ -20642,12 +22459,13 @@ if (typeof window !== "undefined" && window.REALM_ART) {
 
   function viewScene() {
     const ch = chapter(ui.chId);
-    if (!ch || !ch.scenes) {
+    if (!ch || !ch.scenes || !ch.scenes.length) {
       return `<div class="screen-head"><h2>История</h2></div>
         <div class="vn-empty">Глава недоступна. <a data-act="go" data-view="adventure">← Вернуться к главам</a></div>`;
     }
     let idx = State.sceneIndex(ch.id);
     if (idx >= ch.scenes.length) idx = ch.scenes.length - 1;
+    if (idx < 0) idx = 0;
     const sc = ch.scenes[idx];
 
     // портрет и имя говорящего
@@ -20736,9 +22554,7 @@ if (typeof window !== "undefined" && window.REALM_ART) {
       }
       let sol = "";
       if (solved) sol = `<div class="vn-feedback ok"><b>✔ ${esc(f.praise || praiseLine("first"))}</b> ${esc(it.solution || "")}</div>`;
-      else if (f.wrong != null) sol = it.hint
-        ? `<div class="compass-hint">🧭 Компас: ${esc(it.hint)}</div>`
-        : `<div class="vn-feedback bad">Пока не сходится — проверь формулу и единицы, попробуй ещё.</div>`;
+      else if (f.wrong != null) sol = `<div class="compass-hint">🧭 Компас: ${esc(it.hint || "Перечитай условие ещё раз — какая формула или закон здесь подходит?")}</div>`;
       return `<div class="task-card ${solved ? "solved" : ""}">
           <div class="task-q">${esc(it.q)}</div>
           ${it.svg ? `<div class="task-svg">${it.svg}</div>` : ""}
@@ -20827,6 +22643,8 @@ if (typeof window !== "undefined" && window.REALM_ART) {
     else if (ui.view === "zadachnik") screen = viewZadachnik();
     else if (ui.view === "zadachnik-topic") screen = viewZadachnikTopic();
     else if (ui.view === "forces") screen = viewForces();
+    else if (ui.view === "graphs") screen = viewGraphs();
+    else if (ui.view === "constellations") screen = viewConstellations();
     else if (ui.view === "exam") screen = viewExam();
     else if (ui.view === "realm") screen = viewRealm();
     else if (ui.view === "course") screen = viewCourse();
@@ -20840,8 +22658,36 @@ if (typeof window !== "undefined" && window.REALM_ART) {
     else if (ui.view === "share-card") screen = viewShareCard();
     const prevFill = root.querySelector(".bar-xp .bar-fill");
     const prevW = prevFill ? prevFill.style.width : null;
+    // <details> не хранят состояние "открыт" в самой разметке — если экран
+    // перерисовывается, пока какой-то <details> открыт (например, после клика
+    // на самооценку рисунка сил внутри него), он иначе схлопнется обратно.
+    // Запоминаем открытые по порядковому индексу и восстанавливаем после.
+    // ВАЖНО: программное присвоение .open = true само стреляет событие "toggle"
+    // (как и обычный клик), поэтому на время восстановления поднимаем флаг
+    // suppressDetailsToggle — обработчик toggle в mountProbForceIfNeeded должен
+    // проверять этот флаг и не вызывать повторный render(), иначе восстановление
+    // само порождает новый render(), который снова восстанавливает open=true,
+    // и так по кругу (бесконечный цикл).
+    const openDetailsIdx = Array.from(root.querySelectorAll("details.prob-sol"))
+      .map((d, idx) => (d.open ? idx : -1)).filter((idx) => idx >= 0);
     root.innerHTML = hudHTML() + tabsHTML() + `<main class="screen">${screen}</main>`;
+    if (openDetailsIdx.length) {
+      suppressDetailsToggle = true;
+      const allDetails = root.querySelectorAll("details.prob-sol");
+      openDetailsIdx.forEach((idx) => { if (allDetails[idx]) allDetails[idx].open = true; });
+      // "toggle" у <details> — асинхронное событие: оно долетает до слушателя уже
+      // ПОСЛЕ того, как этот синхронный блок кода отработает целиком (проверено:
+      // .open = true не стреляет toggle немедленно). Поэтому сбрасывать флаг здесь
+      // же бесполезно — событие придёт, когда флаг уже снова false, и вызовет
+      // новый render(), который опять восстановит open=true, и так по кругу.
+      // Сбрасываем флаг через setTimeout(0), чтобы он оставался поднятым, пока не
+      // отработают все отложенные toggle-события от этого конкретного restore.
+      setTimeout(() => { suppressDetailsToggle = false; }, 0);
+    }
     mountForcesIfNeeded();
+    mountGraphsIfNeeded();
+    mountZadForceIfNeeded();
+    mountProbForceIfNeeded();
     mountShareCardIfNeeded();
     const newFill = root.querySelector(".bar-xp .bar-fill");
     if (newFill) {
@@ -21037,6 +22883,14 @@ if (typeof window !== "undefined" && window.REALM_ART) {
       const zad = (GAME.zadachnik && GAME.zadachnik["grade" + ui.gradeSel] && GAME.zadachnik["grade" + ui.gradeSel][ui.zadKey]) || null;
       const p = zad ? zad.problems[i] : null;
       if (!p) return;
+      if (p.forceScene) {
+        const drawEl = document.getElementById("zad-force-draw-" + i);
+        const hasDraw = !!(drawEl && drawEl.querySelectorAll("svg [data-i]").length > 0);
+        if (!hasDraw) {
+          toast({ ico: "✏️", strong: "Сначала нарисуй силы", sub: "Возьми инструмент «вектор силы» на палитре выше", ttl: 2200 });
+          return;
+        }
+      }
       const inp = document.getElementById("zad-inp-" + i);
       const val = parseNum(inp ? inp.value : "");
       const ok = checkNum(val, p.answer, p.tol != null ? p.tol : 0.01);
@@ -21060,6 +22914,14 @@ if (typeof window !== "undefined" && window.REALM_ART) {
       const zad = (GAME.zadachnik && GAME.zadachnik["grade" + ui.gradeSel] && GAME.zadachnik["grade" + ui.gradeSel][ui.zadKey]) || null;
       const p = zad ? zad.problems[i] : null;
       if (!p) return;
+      if (p.forceScene) {
+        const drawEl = document.getElementById("zad-force-draw-" + i);
+        const hasDraw = !!(drawEl && drawEl.querySelectorAll("svg [data-i]").length > 0);
+        if (!hasDraw) {
+          toast({ ico: "✏️", strong: "Сначала нарисуй силы", sub: "Возьми инструмент «вектор силы» на палитре выше", ttl: 2200 });
+          return;
+        }
+      }
       const ok = idx === p.correct;
       const hadWrongBefore = !!(ui.zadFb[probKey] && ui.zadFb[probKey].checked && !ui.zadFb[probKey].correct);
       const pLine = ok ? praiseLine(hadWrongBefore ? "retry" : "first") : null;
@@ -21080,6 +22942,14 @@ if (typeof window !== "undefined" && window.REALM_ART) {
       const zad = (GAME.zadachnik && GAME.zadachnik["grade" + ui.gradeSel] && GAME.zadachnik["grade" + ui.gradeSel][ui.zadKey]) || null;
       const p = zad ? zad.problems[i] : null;
       if (!p) return;
+      if (p.forceScene) {
+        const drawEl = document.getElementById("zad-force-draw-" + i);
+        const hasDraw = !!(drawEl && drawEl.querySelectorAll("svg [data-i]").length > 0);
+        if (!hasDraw) {
+          toast({ ico: "✏️", strong: "Сначала нарисуй силы", sub: "Возьми инструмент «вектор силы» на палитре выше", ttl: 2200 });
+          return;
+        }
+      }
       const pLine = praiseLine("open");
       ui.zadFb[probKey] = { revealed: true, praise: pLine };
       const res = State.markZadDone(probKey, { xp: ZAD_XP_OPEN[p.tier] || 3, topicTotal: zad.problems.length });
@@ -21109,6 +22979,52 @@ if (typeof window !== "undefined" && window.REALM_ART) {
       render();
       return;
     }
+    // Самооценка «насколько рисунок похож на эталон» — компактная реплика той же
+    // идеи, что и zad-selfgrade выше, но для силового рисунка. Небольшой XP-бонус
+    // начисляется один раз, только за совпадение/близость (не за «не очень»), чтобы
+    // не поощрять случайный клик наугад.
+    if (act === "zad-force-rate" || act === "prob-force-rate") {
+      const rawKey = node.getAttribute("data-key");
+      const rate = node.getAttribute("data-rate");
+      // В Задачнике probKey хранится и читается без префикса. В Комплексных
+      // задачах renderZadForceReview получает "prob:"+probKey как id-namespace
+      // (чтобы не путать с id-пространством Задачника при общих storageKey) —
+      // здесь этот префикс нужно снять перед записью в ui.probFb, иначе ключ
+      // записи разойдётся с ключом чтения в viewProblems().
+      const probKey = act === "prob-force-rate" ? rawKey.replace(/^prob:/, "") : rawKey;
+      const store = act === "zad-force-rate" ? ui.zadFb : ui.probFb;
+      if (!store[probKey]) store[probKey] = {};
+      const already = !!store[probKey].selfRate;
+      store[probKey].selfRate = rate;
+      if (!already && (rate === "match" || rate === "close")) {
+        const g = State.addXP(rate === "match" ? 4 : 2, "force-selfrate");
+        State.save(); updateHUD();
+        toast({ ico: rate === "match" ? "🎯" : "👍", strong: rate === "match" ? "Точно как эталон!" : "Уже близко", sub: `+${g.gained} XP`, ttl: 1800 });
+      }
+      // На экране Комплексных задач одновременно могут быть открыты до
+      // нескольких десятков силовых сцен — полный render() заново монтирует
+      // ВСЕ активные SVG-редакторы рисования на странице (дорогая операция,
+      // растущая с числом уже открытых решений), хотя из видимых изменений
+      // здесь только замена одного ряда из 3 кнопок на текст-подтверждение.
+      // Обновляем точечно: подменяем содержимое конкретного .zad-conf на
+      // готовую разметку через renderZadForceReview, не трогая остальной DOM.
+      const rateRowContainer = node.closest(".zad-conf");
+      if (rateRowContainer) {
+        const RATE_ACK = {
+          match: "Отлично — ты верно почувствовал(а) направления сил.",
+          close: "Неплохо — сверься с эталоном ещё раз, где именно разошлось.",
+          off: "Ничего, самое важное уже сделано — ты сравнил(а) со схемой сам(а).",
+        };
+        const ackDiv = document.createElement("div");
+        ackDiv.className = "zad-calib";
+        ackDiv.textContent = "🪞 " + (RATE_ACK[rate] || "");
+        rateRowContainer.replaceWith(ackDiv);
+        updateHUD();
+        return;
+      }
+      render();
+      return;
+    }
     if (act === "open-forces") { ui.forces = null; ui.view = "forces"; render(); window.scrollTo(0, 0); return; }
     if (act === "forces-pick") { forcesPick(node.getAttribute("data-id")); return; }
     if (act === "forces-toggle") { forcesToggleChip(node, node.getAttribute("data-id")); return; }
@@ -21117,6 +23033,57 @@ if (typeof window !== "undefined" && window.REALM_ART) {
     if (act === "forces-retry") { forcesRetry(); return; }
     if (act === "forces-next") { forcesNext(); return; }
     if (act === "forces-back") { forcesBack(); return; }
+    if (act === "forces-mode") { forcesSetMode(node.getAttribute("data-mode")); return; }
+    if (act === "forces-free-reveal") { forcesFreeReveal(); return; }
+
+    /* --- 📈 Построй график: отдельный раздел (список сценариев + построение) --- */
+    if (act === "open-graphs") { ui.graphLab = null; ui.view = "graphs"; render(); window.scrollTo(0, 0); return; }
+    if (act === "open-constellations") { ui.view = "constellations"; render(); window.scrollTo(0, 0); return; }
+    if (act === "graphs-pick") {
+      ui.graphLab = { scenarioId: node.getAttribute("data-id"), checked: false, result: null, snapshot: null };
+      render(); window.scrollTo(0, 0);
+      return;
+    }
+    if (act === "graphs-back") { ui.graphLab = null; ui.view = "graphs"; render(); window.scrollTo(0, 0); return; }
+    if (act === "graphs-undo") { if (activeGraphInst) activeGraphInst.undo(); return; }
+    if (act === "graphs-reset") { if (activeGraphInst) activeGraphInst.reset(); return; }
+    if (act === "graphs-check") {
+      const st = ui.graphLab; if (!st || !activeGraphInst) return;
+      const sc = (GAME.graphScenarios || []).find((s) => s.id === st.scenarioId);
+      if (!sc) return;
+      const points = activeGraphInst.getPoints();
+      if (points.length < 2) return;
+      const result = GraphLab.evaluate(sc, points);
+      st.snapshot = points; st.result = result; st.checked = true;
+      tone(result.good ? "correct" : "wrong");
+      if (result.good) {
+        if (!State.data.graphsDone) State.data.graphsDone = {};
+        const already = !!State.data.graphsDone[sc.id];
+        State.data.graphsDone[sc.id] = true;
+        const g = State.addXP(already ? 4 : 12, "problem");
+        State.save(); updateHUD();
+        grantToast({ xp: g.gained }, st.usedRetry ? praiseLine("retry") : praiseLine("first"));
+        confetti(16);
+      }
+      render();
+      return;
+    }
+    if (act === "graphs-retry") {
+      if (!ui.graphLab) return;
+      ui.graphLab = { scenarioId: ui.graphLab.scenarioId, checked: false, result: null, snapshot: null, usedRetry: true };
+      render();
+      return;
+    }
+    if (act === "graphs-next") {
+      if (!ui.graphLab) return;
+      const sc = (GAME.graphScenarios || []).filter((s) => s.grade === ui.gradeSel);
+      const idx = sc.findIndex((s) => s.id === ui.graphLab.scenarioId);
+      const next = sc[idx + 1];
+      ui.graphLab = next ? { scenarioId: next.id, checked: false, result: null, snapshot: null } : null;
+      if (!ui.graphLab) ui.view = "graphs";
+      render(); window.scrollTo(0, 0);
+      return;
+    }
     if (act === "open-exam") { if (examTimer) { clearInterval(examTimer); examTimer = null; } ui.exam = { phase: "intro" }; ui.view = "exam"; render(); window.scrollTo(0, 0); return; }
     if (act === "exam-scope") { if (!ui.exam) ui.exam = {}; ui.exam.scope = node.getAttribute("data-scope"); ui.exam.phase = "len"; render(); window.scrollTo(0, 0); return; }
     if (act === "exam-start") { examStart((ui.exam && ui.exam.scope) || "all", +node.getAttribute("data-n")); return; }
@@ -21124,8 +23091,10 @@ if (typeof window !== "undefined" && window.REALM_ART) {
       const e = ui.exam; if (!e || e.answered || e.cur.kind !== "num") return;
       const t = e.cur.task; const inp = document.getElementById("inp-exam");
       const ok = checkNum(parseNum(inp ? inp.value : ""), t.a, t.tol || 0.01);
+      const w = EXAM_PTS[e.cur.level] || 1;
       e.answered = true; e.ok = ok;
-      if (ok) { e.score++; e.points += (EXAM_PTS[e.cur.level] || 1); tone("correct"); bumpQuest("exam", 1); } else { tone("wrong"); }
+      e.maxPoints = (e.maxPoints || 0) + w;
+      if (ok) { e.score++; e.points += w; tone("correct"); bumpQuest("exam", 1); } else { tone("wrong"); }
       render();
       return;
     }
@@ -21133,6 +23102,7 @@ if (typeof window !== "undefined" && window.REALM_ART) {
       const e = ui.exam; if (!e || e.answered || e.cur.kind !== "mc") return;
       const ok = (+node.getAttribute("data-idx")) === e.cur.q.correct;
       e.answered = true; e.ok = ok;
+      e.maxPoints = (e.maxPoints || 0) + 1;
       if (ok) { e.score++; e.points += 1; tone("correct"); bumpQuest("exam", 1); } else { tone("wrong"); }
       render();
       return;
@@ -21895,5 +23865,30 @@ if (typeof window !== "undefined" && window.REALM_ART) {
 })();
 </script>
 
+  <!-- PWA: манифест, apple-touch-icon и Service Worker подключаются здесь,
+       ПОСЛЕ того как игра уже полностью загрузилась и работает — а не в
+       <head>, чтобы попытка их загрузки никак не могла помешать самой
+       игре запуститься (см. комментарий в <head> выше). Всё это работает
+       только на настоящем хостинге (https://) — при открытии файла
+       напрямую с диска (file://) этот блок ничего не делает, просто
+       тихо пропускает шаг, и игра идёт как обычная веб-страница. -->
+  <script>
+    (function () {
+      if (location.protocol !== "https:" && location.hostname !== "localhost") return; // file:// и т.п. — пропускаем весь PWA-блок
+      try {
+        var link = document.createElement("link");
+        link.rel = "manifest"; link.href = "manifest.json";
+        document.head.appendChild(link);
+        var icon = document.createElement("link");
+        icon.rel = "apple-touch-icon"; icon.href = "icon-180.png";
+        document.head.appendChild(icon);
+      } catch (_) {}
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+          navigator.serviceWorker.register("sw.js").catch(function () { /* нет sw.js рядом — не страшно, просто без офлайна */ });
+        });
+      }
+    })();
+  </script>
 </body>
 </html>
