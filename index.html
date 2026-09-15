@@ -957,7 +957,7 @@ button.hud-chip.streak-off { color: var(--muted, #9aa0c7); opacity: .7; }
 .mq-act-ico { font-size: 18px; }
 .mq-act-sum { font-size: 12px; color: var(--muted, #9aa0c7); margin: 4px 0 10px; }
 .mq-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; cursor: pointer;
-  padding: 10px 12px; margin-bottom: 7px; border-radius: 11px; transition: .15s;
+  padding: 10px 12px; margin-bottom: 7px; border-radius: 11px; transition: .15s; overflow: hidden;
   border: 1px solid rgba(255,255,255,.10); background: rgba(255,255,255,.03); color: var(--text, #eef1ff); font-size: 14px; font-family: var(--font-body, inherit); }
 .mq-row:hover { border-color: var(--plasma-cyan, #38e1ff); transform: translateX(2px); }
 .mq-row.done { border-color: rgba(126,231,135,.4); background: rgba(126,231,135,.07); }
@@ -967,8 +967,16 @@ button.hud-chip.streak-off { color: var(--muted, #9aa0c7); opacity: .7; }
 .mq-st.done { background: #7ee787; color: #06210b; }
 .mq-st.go { background: var(--plasma-cyan, #38e1ff); color: #042430; }
 .mq-st.lock { background: rgba(255,255,255,.10); }
-.mq-title { flex: 1; }
-.mq-formula { flex: none; font-size: 12px; color: var(--star-gold, #ffd166); font-family: "Russo One", monospace; }
+.mq-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Формула-подсказка (например, "1 км = 1000 м; 1 м = 100 см = 1000 мм") — на
+   узких экранах не всегда помещается рядом с названием темы. Раньше она
+   просто вылезала за правый край кнопки (flex: none без ограничения
+   ширины), наезжая на соседние элементы интерфейса. max-width + ellipsis
+   аккуратно обрезают её в самой кнопке, если места не хватает — .mq-title
+   выше уже забирает себе основное пространство (flex:1), а это — запасной
+   предел на случай очень узкого экрана или длинной формулы. */
+.mq-formula { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 12px; color: var(--star-gold, #ffd166); font-family: "Russo One", monospace; }
 .mq-zad-badge { flex: none; font-size: 11px; padding: 2px 7px; border-radius: 999px; background: rgba(255,255,255,.06); color: var(--muted, #9aa0c7); border: 1px solid rgba(255,255,255,.1); }
 .mq-zad-badge.full { background: rgba(74,222,128,.12); color: #4ade80; border-color: rgba(74,222,128,.35); }
 .zad-nudge { margin: 14px auto 0; border: 1px solid rgba(255,209,102,.4); box-shadow: 0 0 0 1px rgba(255,209,102,.12), 0 4px 18px rgba(255,209,102,.10); animation: zadPulse 2.2s ease-in-out 1; }
@@ -22167,9 +22175,18 @@ if (typeof window !== "undefined" && window.REALM_ART) {
         </div>
         <div class="onb-counter">${step + 1} из ${ONB.length}</div>`;
 
-    el.className = "onb-overlay" + (visible ? " has-spot" : "");
+    // has-spot (прозрачный фон оверлея + видимая тень вокруг подсветки)
+    // имеет смысл ТОЛЬКО когда карточка реально прижата к краю подсветки
+    // (anchored) — тогда у неё свой непрозрачный фон, и общий контент виден
+    // вокруг через прозрачный оверлей. Если элемент оказался слишком большим
+    // и карточка ушла в центрированный режим (anchored=false), оверлею
+    // нужен обычный непрозрачный фон — иначе центрированная карточка не
+    // имеет собственного фона и попросту не видна на экране, а тень вокруг
+    // подсветки не проявляется нигде, если сам подсвечиваемый элемент
+    // больше видимой области экрана (весь экран оказывается "внутри выреза").
+    el.className = "onb-overlay" + (visible && anchored ? " has-spot" : "");
     el.innerHTML = `
-      ${spotlight}
+      ${anchored ? spotlight : ""}
       <div class="onb-card ${anchored ? "onb-card-anchored" : ""}" ${cardPos}>${cardBody}</div>`;
 
     // MIN_CARD_SPACE выше — это ОЦЕНКА порога, а не гарантия: реальная высота
@@ -22185,7 +22202,8 @@ if (typeof window !== "undefined" && window.REALM_ART) {
         const cr = cardEl.getBoundingClientRect();
         const fitsScreen = cr.top >= 0 && cr.bottom <= window.innerHeight;
         if (!fitsScreen) {
-          el.innerHTML = `${spotlight}<div class="onb-card">${cardBody}</div>`;
+          el.className = "onb-overlay"; // без has-spot: у неанкорной карточки должен быть непрозрачный фон
+          el.innerHTML = `<div class="onb-card">${cardBody}</div>`;
         }
       }
     }
